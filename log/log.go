@@ -152,3 +152,9 @@ func Println(args ...interface{}) {
 func Printf(template string, args ...interface{}) {
 	GlobalLogger.Infof(template, args...)
 }
+
+func Condf(cond bool, template string, args ...interface{}) {
+	if cond {
+		GlobalLogger.Debugf(template, args...)
+	}
+}
