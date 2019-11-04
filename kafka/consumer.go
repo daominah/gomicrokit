@@ -2,7 +2,11 @@ package kafka
 
 import (
 	"context"
+	"fmt"
+	golog "log"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -20,6 +24,7 @@ const (
 var (
 	ErrReadMsgTimeout     = errors.New("read message timeout")
 	ErrReadClosedConsumer = errors.New("read message on closed consumer")
+	ErrReadNoReceiver     = errors.New("no ConsumeClaim is running")
 )
 
 // ConsumerConfig should be created by NewConsumerConfig (for default values)
@@ -54,6 +59,7 @@ type Consumer struct {
 }
 
 func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
+	sarama.Logger = golog.New(os.Stdout, "[sarama] ", golog.LstdFlags)
 	log.Infof("creating a consumer from %#v", conf)
 	// construct sarama config
 	kafkaVersion, err := sarama.ParseKafkaVersion("1.1.1")
@@ -74,9 +80,8 @@ func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	log.Infof("connected to kafka cluster %v", conf.BootstrapServers)
 
 	c.handler = &ConsumerGroupHandlerImpl{
-		consumer:    c,
-		readyChan:   make(chan bool),
-		readMsgChan: make(chan *ReadMsgRequest),
+		consumer:  c,
+		readyChan: make(chan bool),
 	}
 	var ctx context.Context
 	ctx, c.cancelFunc = context.WithCancel(context.Background())
@@ -113,21 +118,6 @@ func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	return c, nil
 }
 
-func (c *Consumer) Close() {
-	c.closed = true
-	if c.cancelFunc != nil {
-		c.cancelFunc()
-	}
-	if c.client != nil {
-		log.Debugf("consumer_Close cp1")
-		err := c.client.Close()
-		// TODO: hanging here
-		log.Debugf("error when close client: %v", err)
-	}
-	log.Debugf("consumer_Close cp2")
-
-}
-
 type ReadMsgRequest struct {
 	ctx          context.Context
 	responseChan chan *Message
@@ -137,13 +127,24 @@ type ConsumerGroupHandlerImpl struct {
 	consumer *Consumer
 	// close this channel to notify client joined consumer group successfully
 	readyChan chan bool
-	// send to this channel to read a kafka message
-	readMsgChan chan *ReadMsgRequest
+	// each entry in this map correspond to a assigned partition,
+	// consumer_ReadMessage send to all these channels, receive the first result
+	readMsgChans map[string](chan *ReadMsgRequest)
+	mutex        sync.RWMutex
 }
 
 func (h *ConsumerGroupHandlerImpl) Setup(s sarama.ConsumerGroupSession) error {
 	log.Infof("joined consumer group, assigned partitions %#v", s.Claims())
 	h.consumer.isTryingReconnect = false
+	h.mutex.Lock()
+	h.readMsgChans = make(map[string](chan *ReadMsgRequest))
+	for topic, parts := range s.Claims() {
+		for _, part := range parts {
+			h.readMsgChans[fmt.Sprintf("%v:%v", topic, part)] =
+				make(chan *ReadMsgRequest)
+		}
+	}
+	h.mutex.Unlock()
 	close(h.readyChan)
 	return nil
 }
@@ -152,15 +153,25 @@ func (h *ConsumerGroupHandlerImpl) Cleanup(sarama.ConsumerGroupSession) error {
 	return nil
 }
 
+// TODO: handle claimMessagesChan close while we are not reading at this time
 // each assigned partition will run this func in a goroutine
 func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
 	session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	partition := fmt.Sprintf("%v:%v", claim.Topic(), claim.Partition())
+	defer log.Infof("func ConsumeClaim for %v returned", partition)
+	log.Infof("claim %v ConsumeClaim func started", partition)
+	h.mutex.RLock()
+	readMsgChan, ok := h.readMsgChans[partition]
+	h.mutex.RUnlock()
+	if !ok {
+		return nil
+	}
+	claimMessagesChan := claim.Messages()
 	for i := 0; i > -1; i++ {
-		readRequest := <-h.readMsgChan
+		readRequest := <-readMsgChan
 		select {
-		case samMsg, opening := <-claim.Messages():
+		case samMsg, opening := <-claimMessagesChan:
 			if !opening {
-				log.Infof("handler func ConsumeClaim returned")
 				return nil
 			}
 			if samMsg != nil {
@@ -173,13 +184,13 @@ func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
 				case readRequest.responseChan <- msg:
 					session.MarkMessage(samMsg, "")
 				case <-readRequest.ctx.Done():
-					log.Infof("timed out when reply to read message")
+					log.Debugf("partition %v ctx cancelled 1", partition)
 				}
 			} else {
-				log.Debugf("huh?")
+				log.Debugf("partition %v ctx cancelled 2", partition)
 			}
 		case <-readRequest.ctx.Done():
-			// read message request timed out
+			log.Debugf("partition %v ctx cancelled 3", partition)
 			continue
 		}
 	}
@@ -198,18 +209,42 @@ func (c Consumer) ReadMessage(timeout time.Duration) (*Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	request := &ReadMsgRequest{ctx: ctx, responseChan: make(chan *Message)}
-	select {
-	case c.handler.readMsgChan <- request:
+	// send the request to all partitions reader, return the first result
+	cloned := make([]chan *ReadMsgRequest, 0)
+	c.handler.mutex.RLock()
+	for _, v := range c.handler.readMsgChans {
+		cloned = append(cloned, v)
+	}
+	c.handler.mutex.RUnlock()
+	for _, partitionChan := range cloned {
 		select {
-		case msg := <-request.responseChan:
-			return msg, nil
+		case partitionChan <- request:
+			select {
+			case msg := <-request.responseChan:
+				return msg, nil
+			case <-ctx.Done():
+				return nil, ErrReadMsgTimeout
+			}
 		case <-ctx.Done():
+			// because client disconnected to kafka so ConsumeClaim is not running
+			// or timeout duration is too short
+			//log.Debugf("time out when send to partitionChan")
 			return nil, ErrReadMsgTimeout
 		}
-	case <-ctx.Done():
-		// because client disconnected to kafka so ConsumeClaim is not running
-		// or timeout duration is too short
-		//log.Debugf("time out when send to c_handler_readMsgChan")
-		return nil, ErrReadMsgTimeout
 	}
+	return nil, ErrReadNoReceiver
+}
+
+func (c *Consumer) Close() {
+	c.closed = true
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+	}
+	if c.client != nil {
+		log.Debugf("consumer_Close cp1")
+		err := c.client.Close()
+		// TODO: hanging here
+		log.Debugf("error when close client: %v", err)
+	}
+	log.Debugf("consumer_Close cp2")
 }

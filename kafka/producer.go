@@ -48,7 +48,9 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 	samMsg := &sarama.ProducerMessage{
 		Value: sarama.StringEncoder(value),
 		Topic: topic,
-		Key:   sarama.StringEncoder(key),
+	}
+	if key != "" {
+		samMsg.Key = sarama.StringEncoder(key)
 	}
 	log.Infof("sending msg %v to topic %v:%v: %v",
 		uniqueId, samMsg.Topic, samMsg.Key, samMsg.Value)
