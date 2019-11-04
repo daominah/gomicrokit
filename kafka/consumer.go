@@ -60,14 +60,14 @@ func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error when parse kafka version")
 	}
-	saConf := sarama.NewConfig()
-	saConf.Version = kafkaVersion
-	saConf.Consumer.Offsets.Initial = int64(conf.Offset)
+	samConf := sarama.NewConfig()
+	samConf.Version = kafkaVersion
+	samConf.Consumer.Offsets.Initial = int64(conf.Offset)
 
 	// connect to kafka
 	c := &Consumer{}
 	brokers := strings.Split(conf.BootstrapServers, ",")
-	c.client, err = sarama.NewConsumerGroup(brokers, conf.GroupId, saConf)
+	c.client, err = sarama.NewConsumerGroup(brokers, conf.GroupId, samConf)
 	if err != nil {
 		return nil, errors.Wrap(err, "err when create consumer client")
 	}
