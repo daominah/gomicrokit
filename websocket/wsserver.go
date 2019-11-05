@@ -50,7 +50,7 @@ package websocket
 //		}
 //		connId := core.ConnectionId(maths.GenUUID())
 //		conn := &Connection{
-//			Id:             connId,
+//			id:             connId,
 //			conn:           wsConn,
 //			CreateAt:       time.Now(),
 //			WriteChan:      make(chan []byte),
@@ -60,10 +60,10 @@ package websocket
 //		}
 //		log.Debugf("new connection %v: %v", conn.conn.RemoteAddr(), connId)
 //		s.mutex.Lock()
-//		s.connections[conn.Id] = conn
+//		s.connections[conn.id] = conn
 //		s.mutex.Unlock()
-//		go conn.ReadPump()
-//		go conn.WritePump()
+//		go conn.readPump()
+//		go conn.writePump()
 //		go conn.DisconnectCallback()
 //	}
 //}

@@ -1,7 +1,9 @@
 package websocket
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/daominah/gomicrokit/log"
@@ -58,49 +60,62 @@ type Connection struct {
 	// Handle will be called in goroutine when received a msg from remote
 	OnReadHandler OnReadHandler
 	// any unique string
-	Id       ConnectionId
+	id       ConnectionId
 	createAt time.Time
 	// using by writePump to ensure one concurrent writer.
 	writeChan chan []byte
-	// receive notification when ReadPump and WritePump ended
-	disconnectChan chan bool
-	IsDisconnected bool
+	// closedChan will be closed by this_notifyClosed when the conn disconnected
+	closedChan   <-chan struct{}
+	notifyClosed context.CancelFunc
 }
 
 func genConnId(goraConn *goraws.Conn) ConnectionId {
 	if goraConn == nil {
-		return ConnectionId(fmt.Sprintf("ws%v", maths.GenUUID()))
+		return ConnectionId(fmt.Sprintf("[ws|%v]", maths.GenUUID()))
 	}
-	return ConnectionId(fmt.Sprintf("[ws%v|%v|%v]",
-		goraConn.LocalAddr(), goraConn.RemoteAddr(), maths.GenUUID()[:4]))
+	localAddr := goraConn.LocalAddr().String()
+	colon := strings.Index(localAddr, ":")
+	if colon != -1 {
+		localAddr = localAddr[colon:]
+	}
+	return ConnectionId(fmt.Sprintf("[ws|%v|%v|%v]",
+		localAddr, goraConn.RemoteAddr(), maths.GenUUID()[:4]))
+}
+
+func Dial(wsServerAddr string) (*goraws.Conn, error) {
+	goraConn, _, err := goraws.DefaultDialer.Dial(wsServerAddr, nil)
+	return goraConn, err
 }
 
 // Wrap a connected gorilla websocket,
 // this_Write and this_WriteBytes is safe to use in many goroutines
-func NewConnection(goraConn *goraws.Conn, handler OnReadHandler) *Connection {
-	if handler == nil {
-		handler = &emptyHandler{}
+func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler,
+	onDisconnect func(*Connection)) *Connection {
+	if onRead == nil {
+		onRead = &emptyHandler{}
 	}
+	ctx, calcel := context.WithCancel(context.Background())
 	c := &Connection{
-		conn:           goraConn,
-		OnReadHandler:  handler,
-		Id:             genConnId(goraConn),
-		createAt:       time.Now(),
-		writeChan:      make(chan []byte),
-		disconnectChan: make(chan bool, 2),
-		IsDisconnected: false,
+		conn:          goraConn,
+		OnReadHandler: onRead,
+		id:            genConnId(goraConn),
+		createAt:      time.Now(),
+		writeChan:     make(chan []byte),
+		closedChan:    ctx.Done(),
+		notifyClosed:  calcel,
 	}
-	go c.WritePump()
-	go c.ReadPump()
-	go c.OnDisconnect()
+	go c.writePump()
+	go c.readPump()
+	go c.onDisconnect(onDisconnect)
+	log.Condf(Log, "connection %v started", c.id)
 	return c
 }
 
-func (c *Connection) ReadPump() {
+func (c *Connection) readPump() {
 	defer func() {
 		c.conn.Close()
-		log.Condf(Log, "read pump of %v returned", c.Id)
-		c.disconnectChan <- true
+		c.notifyClosed()
+		log.Condf(Log, "read pump of %v returned", c.id)
 	}()
 	c.conn.SetReadLimit(wscfg.LimitMessageBytes)
 	c.conn.SetReadDeadline(time.Now().Add(wscfg.PongWait))
@@ -111,63 +126,62 @@ func (c *Connection) ReadPump() {
 	for {
 		_, messageB, err := c.conn.ReadMessage()
 		if err != nil {
-			log.Condf(Log, "error when %v read message: %v", c.Id, err)
+			log.Condf(Log, "error when %v read message: %v", c.id, err)
 			break
 		}
 		msg := string(messageB)
-		log.Condf(Log, "received a message from %v: %v", c.Id, msg)
-		go c.OnReadHandler.Handle(c.Id, msg)
+		log.Condf(Log, "received a message from %v: %v", c.id, msg)
+		go c.OnReadHandler.Handle(c.id, msg)
 	}
 }
 
 // Ensure there is at most one writer to a connection by  executing all writes
 // from this goroutine.
-func (c *Connection) WritePump() {
+func (c *Connection) writePump() {
 	ticker := time.NewTicker(wscfg.PingPeriod)
 	defer func() {
 		ticker.Stop()
 		c.conn.Close()
-		log.Condf(Log, "write pump of %v returned", c.Id)
-		c.disconnectChan <- true
+		c.notifyClosed()
+		log.Condf(Log, "write pump of %v returned", c.id)
 	}()
 	for {
-		var msgB []byte
 		select {
-		case msgB = <-c.writeChan:
+		case msgB := <-c.writeChan:
 			c.conn.SetWriteDeadline(time.Now().Add(wscfg.WriteWait))
 			err := c.conn.WriteMessage(goraws.TextMessage, msgB)
 			if err != nil {
-				log.Condf(Log, "error when write to %v: %v", c.Id, err)
+				log.Condf(Log, "error when write to %v: %v", c.id, err)
 				return
 			}
+			log.Condf(Log, "wrote to %v msg: %v", c.id, string(msgB))
 		case <-ticker.C:
-			msgB = []byte("PING")
 			c.conn.SetWriteDeadline(time.Now().Add(wscfg.WriteWait))
 			err := c.conn.WriteMessage(goraws.PingMessage, nil)
 			if err != nil {
-				log.Condf(Log, "error when ping to %v: %v", c.Id, err)
+				log.Condf(Log, "error when ping to %v: %v", c.id, err)
 				return
 			}
 		}
-		log.Condf(Log, "wrote to %v msg: %v", c.Id, string(msgB))
+
 	}
 }
 
-func (c *Connection) OnDisconnect() {
-	<-c.disconnectChan
-	c.IsDisconnected = true
-	log.Condf(Log, "connection %v disconnected", c.Id)
+func (c *Connection) onDisconnect(callback func(*Connection)) {
+	<-c.closedChan
+	log.Condf(Log, "connection %v disconnected", c.id)
+	if callback == nil {
+		return
+	}
+	callback(c)
 }
 
 func (c *Connection) WriteBytes(message []byte) {
-	if c.IsDisconnected {
-		return
-	}
 	timeout := time.After(3 * time.Second)
 	select {
 	case c.writeChan <- message:
 	case <-timeout:
-		log.Infof("timeout when send to write chan of %v", c.Id)
+		log.Infof("timeout when send to write chan of %v", c.id)
 	}
 }
 
@@ -176,6 +190,7 @@ func (c *Connection) Write(message string) {
 }
 
 func (c *Connection) Close() {
-	log.Condf(Log, "about to close %v", c.Id)
+	log.Condf(Log, "about to close %v", c.id)
 	c.conn.Close()
+	c.notifyClosed()
 }
