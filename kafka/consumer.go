@@ -184,13 +184,13 @@ func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
 				case readRequest.responseChan <- msg:
 					session.MarkMessage(samMsg, "")
 				case <-readRequest.ctx.Done():
-					log.Debugf("partition %v ctx cancelled 1", partition)
+					//log.Debugf("partition %v cannot respond ", partition)
 				}
 			} else {
-				log.Debugf("partition %v ctx cancelled 2", partition)
+				log.Infof("unexpected branch nil saramaMsg", partition)
 			}
 		case <-readRequest.ctx.Done():
-			log.Debugf("partition %v ctx cancelled 3", partition)
+			// because of timed out or cancelled when first result returned
 			continue
 		}
 	}
@@ -209,30 +209,33 @@ func (c Consumer) ReadMessage(timeout time.Duration) (*Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	request := &ReadMsgRequest{ctx: ctx, responseChan: make(chan *Message)}
-	// send the request to all partitions reader, return the first result
-	cloned := make([]chan *ReadMsgRequest, 0)
+
+	// send the request to all partitions reader
+	readMsgChans := make([]chan *ReadMsgRequest, 0)
 	c.handler.mutex.RLock()
 	for _, v := range c.handler.readMsgChans {
-		cloned = append(cloned, v)
+		readMsgChans = append(readMsgChans, v)
 	}
 	c.handler.mutex.RUnlock()
-	for _, partitionChan := range cloned {
-		select {
-		case partitionChan <- request:
+	for _, partitionChan := range readMsgChans {
+		go func(partitionChan chan *ReadMsgRequest) {
 			select {
-			case msg := <-request.responseChan:
-				return msg, nil
+			case partitionChan <- request:
 			case <-ctx.Done():
-				return nil, ErrReadMsgTimeout
+				// this branch will execute when client disconnected to kafka so
+				// ConsumeClaim is not running or timeout duration is too short
 			}
-		case <-ctx.Done():
-			// because client disconnected to kafka so ConsumeClaim is not running
-			// or timeout duration is too short
-			//log.Debugf("time out when send to partitionChan")
-			return nil, ErrReadMsgTimeout
-		}
+		}(partitionChan)
 	}
-	return nil, ErrReadNoReceiver
+
+	// only receive the first reply from partition readers,
+	// only this partition reader can commit offset
+	select {
+	case msg := <-request.responseChan:
+		return msg, nil
+	case <-ctx.Done():
+		return nil, ErrReadMsgTimeout
+	}
 }
 
 func (c *Consumer) Close() {

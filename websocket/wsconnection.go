@@ -16,7 +16,7 @@ var Log = true
 var wscfg = wsConfig{
 	WriteWait:         10 * time.Second,
 	PongWait:          60 * time.Second,
-	PingPeriod:        54 * time.Second,
+	PingPeriod:        25 * time.Second,
 	LimitMessageBytes: 65536,
 }
 
@@ -34,10 +34,10 @@ type wsConfig struct {
 }
 
 func SetWebsocketConfig(writeWait time.Duration, pongWait time.Duration,
-	limitMessageBytes int64) {
+	pingPeriod time.Duration, limitMessageBytes int64) {
 	wscfg.WriteWait = writeWait
 	wscfg.PongWait = pongWait
-	wscfg.PingPeriod = pongWait * 9 / 10
+	wscfg.PingPeriod = pingPeriod
 	wscfg.LimitMessageBytes = limitMessageBytes
 }
 

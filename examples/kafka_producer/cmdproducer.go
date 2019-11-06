@@ -10,18 +10,19 @@ import (
 func main() {
 	conf := kafka.ProducerConfig{
 		BrokersList:  "127.0.0.1:9092",
-		DefaultTopic: "topic05",
+		DefaultTopic: "topic10",
 	}
 	producer, err := kafka.NewProducer(conf)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for i := 0; i > -1; i++ {
-		time.Sleep(450 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 		err := producer.SendMessage(fmt.Sprintf("pussy %v", i))
 		//err := producer.SendExplicitMessage(conf.DefaultTopic, fmt.Sprintf("pussy %v", i), "key0")
 		if err != nil {
 			log.Info(err)
 		}
+		break
 	}
 }

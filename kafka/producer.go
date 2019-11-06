@@ -52,13 +52,13 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 	if key != "" {
 		samMsg.Key = sarama.StringEncoder(key)
 	}
-	log.Infof("sending msg %v to topic %v:%v: %v",
-		uniqueId, samMsg.Topic, samMsg.Key, samMsg.Value)
+	log.Infof("sending msg %v to %v:%v: %v",
+		uniqueId, samMsg.Topic, key, samMsg.Value)
 	partition, offset, err := p.samProducer.SendMessage(samMsg)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error when send msg %v", uniqueId))
 	}
-	log.Infof("delivered msg %v to topic %v:%v:%v",
+	log.Infof("delivered msg %v to %v:%v:%v",
 		uniqueId, samMsg.Topic, partition, offset)
 	return nil
 }
