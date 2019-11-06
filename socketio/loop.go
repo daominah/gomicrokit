@@ -59,7 +59,6 @@ type Channel struct {
 create channel, map, and set active
 */
 func (c *Channel) initChannel() {
-	//TODO: queueBufferSize from constant to server or client variable
 	c.out = make(chan string, queueBufferSize)
 	c.ack.resultWaiters = make(map[int](chan string))
 	c.alive = true
@@ -139,7 +138,7 @@ func inLoop(c *Channel, m *methods) error {
 			go m.processIncomingMessage(c, msg)
 		}
 	}
-	return nil
+	//return nil
 }
 
 var overflooded map[*Channel]struct{} = make(map[*Channel]struct{})
@@ -181,7 +180,7 @@ func outLoop(c *Channel, m *methods) error {
 			return closeChannel(c, m, err)
 		}
 	}
-	return nil
+	//return nil
 }
 
 /**

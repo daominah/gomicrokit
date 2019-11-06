@@ -10,7 +10,8 @@ import (
 
 func main() {
 	websocket.Log = true
-	websocket.SetWebsocketConfig(2*time.Second, 5*time.Second, 65536)
+	websocket.SetWebsocketConfig(
+		2*time.Second, 5*time.Second, 4*time.Second, 65536)
 
 	for k := 0; k < 3; k++ {
 		goraConn, err := websocket.Dial("ws://127.0.0.1:8000/")

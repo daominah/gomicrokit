@@ -9,11 +9,20 @@ go get ./...
 # Packages
 
 ### `log`
-A leveled, rotated, fast, structured logger.  
-Base on `go.uber.org/zap` and `github.com/natefinch/lumberjack`.
+A leveled, rotated by time or file size logger.  
+Base on [go.uber.org/zap]() and [github.com/natefinch/lumberjack]()
+
 ### `maths`
+Often used math functions
+
 ### `kafka`
+An easy-to-use, pure go kafka client base on [github.com/Shopify/sarama]()
+
 ### `websocket`
+An easy-to-use websocket client and server base on [github.com/gorilla/websocket]()
+
+### `socketio`
+Modified from [github.com/graarh/golang-socketio]()
 
 # Docker
 ```docker build --tag=gomicrokit --file=./Dockerfile .```  
