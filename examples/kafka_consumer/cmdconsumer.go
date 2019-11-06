@@ -10,7 +10,7 @@ import (
 func main() {
 	conf := kafka.ConsumerConfig{
 		BootstrapServers: "127.0.0.1:9092",
-		Topics:           "topic10",
+		Topics:           "topic11",
 		GroupId:          "group0",
 		//GroupId:          fmt.Sprintf("group%v", time.Now().UnixNano()),
 		Offset: kafka.OffsetEarliest}

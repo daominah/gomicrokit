@@ -3,11 +3,16 @@ package kafka
 import (
 	"strings"
 
+	"time"
+
 	"github.com/Shopify/sarama"
 	"github.com/daominah/gomicrokit/log"
-	"github.com/pkg/errors"
 	"github.com/daominah/gomicrokit/maths"
-	"fmt"
+	"github.com/pkg/errors"
+)
+
+var (
+	ErWriteTimeout = errors.New("write message timeout")
 )
 
 type ProducerConfig struct {
@@ -18,7 +23,7 @@ type ProducerConfig struct {
 
 type Producer struct {
 	defaultTopic string
-	samProducer  sarama.SyncProducer
+	samProducer  sarama.AsyncProducer
 }
 
 func NewProducer(conf ProducerConfig) (*Producer, error) {
@@ -33,12 +38,23 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	p := &Producer{defaultTopic: conf.DefaultTopic}
 	brokers := strings.Split(conf.BrokersList, ",")
 	var err error
-	p.samProducer, err = sarama.NewSyncProducer(brokers, samConf)
+	p.samProducer, err = sarama.NewAsyncProducer(brokers, samConf)
 	if err != nil {
 		return nil, errors.Wrap(err, "error when create producer")
 	}
 	log.Infof("connected to kafka cluster %v", conf.BrokersList)
-
+	go func() {
+		for err := range p.samProducer.Errors() {
+			log.Infof("failed to write kafka msg: %#v", err)
+		}
+	}()
+	go func() {
+		for sent := range p.samProducer.Successes() {
+			log.Infof("delivered msg %v to topic %v:%v:%v",
+				sent.Metadata, sent.Topic, sent.Partition, sent.Offset)
+		}
+	}()
+	// TODO: check if disconnect
 	return p, nil
 }
 
@@ -46,21 +62,23 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 func (p Producer) SendExplicitMessage(topic string, value string, key string) error {
 	uniqueId := maths.GenUUID()[:8]
 	samMsg := &sarama.ProducerMessage{
-		Value: sarama.StringEncoder(value),
-		Topic: topic,
+		Value:    sarama.StringEncoder(value),
+		Topic:    topic,
+		Metadata: uniqueId,
 	}
 	if key != "" {
 		samMsg.Key = sarama.StringEncoder(key)
 	}
-	log.Infof("sending msg %v to %v:%v: %v",
-		uniqueId, samMsg.Topic, key, samMsg.Value)
-	partition, offset, err := p.samProducer.SendMessage(samMsg)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error when send msg %v", uniqueId))
+	var err error
+	select {
+	case p.samProducer.Input() <- samMsg:
+		log.Infof("sending msg %v to %v:%v: %v",
+			uniqueId, samMsg.Topic, key, samMsg.Value)
+		err = nil
+	case <-time.After(1 * time.Second):
+		err = ErWriteTimeout
 	}
-	log.Infof("delivered msg %v to %v:%v:%v",
-		uniqueId, samMsg.Topic, partition, offset)
-	return nil
+	return err
 }
 
 func (p Producer) SendMessage(value string) error {
