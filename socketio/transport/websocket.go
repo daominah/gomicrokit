@@ -108,7 +108,7 @@ func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) 
 	}
 	connId := myws.GenConnId(socket)
 	log.Condf(myws.Log, "%v connected", connId)
-	return &WebsocketConnection{socket, wst, connId}, nil
+	return &WebsocketConnection{socket: socket, transport: wst, id: connId}, nil
 }
 
 func (wst *WebsocketTransport) HandleConnection(
@@ -124,8 +124,9 @@ func (wst *WebsocketTransport) HandleConnection(
 		http.Error(w, upgradeFailed+err.Error(), 503)
 		return nil, ErrorHttpUpgradeFailed
 	}
-
-	return &WebsocketConnection{socket, wst}, nil
+	connId := myws.GenConnId(socket)
+	log.Condf(myws.Log, "%v connected", connId)
+	return &WebsocketConnection{socket: socket, transport: wst, id: connId}, nil
 }
 
 /**
