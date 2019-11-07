@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/daominah/gomicrokit/log"
+	myws "github.com/daominah/gomicrokit/websocket"
 	"github.com/gorilla/websocket"
 )
 
@@ -31,6 +33,7 @@ var (
 type WebsocketConnection struct {
 	socket    *websocket.Conn
 	transport *WebsocketTransport
+	id        myws.ConnectionId
 }
 
 func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
@@ -50,6 +53,7 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 		return "", ErrorBadBuffer
 	}
 	text := string(data)
+	log.Condf(myws.Log, "received a message from %v: %v", wsc.id, text)
 
 	//empty messages are not allowed
 	if len(text) == 0 {
@@ -69,6 +73,7 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	if _, err := writer.Write([]byte(message)); err != nil {
 		return err
 	}
+	log.Condf(myws.Log, "wrote to %v msg: %v", wsc.id, message)
 	if err := writer.Close(); err != nil {
 		return err
 	}
@@ -101,8 +106,9 @@ func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) 
 	if err != nil {
 		return nil, err
 	}
-
-	return &WebsocketConnection{socket, wst}, nil
+	connId := myws.GenConnId(socket)
+	log.Condf(myws.Log, "%v connected", connId)
+	return &WebsocketConnection{socket, wst, connId}, nil
 }
 
 func (wst *WebsocketTransport) HandleConnection(

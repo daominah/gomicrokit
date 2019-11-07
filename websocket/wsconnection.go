@@ -2,12 +2,12 @@ package websocket
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/daominah/gomicrokit/log"
-	"github.com/daominah/gomicrokit/maths"
 	goraws "github.com/gorilla/websocket"
 )
 
@@ -69,22 +69,41 @@ type Connection struct {
 	notifyClosed context.CancelFunc
 }
 
-func genConnId(goraConn *goraws.Conn) ConnectionId {
+// return same id for the same connection object
+func GenConnId(goraConn *goraws.Conn) ConnectionId {
 	if goraConn == nil {
-		return ConnectionId(fmt.Sprintf("[ws|%v]", maths.GenUUID()))
+		return ConnectionId(fmt.Sprintf("[ws|nil]"))
 	}
 	localAddr := goraConn.LocalAddr().String()
 	colon := strings.Index(localAddr, ":")
 	if colon != -1 {
 		localAddr = localAddr[colon:]
 	}
-	return ConnectionId(fmt.Sprintf("[ws|%v|%v|%v]",
-		localAddr, goraConn.RemoteAddr(), maths.GenUUID()[:4]))
+	return ConnectionId(fmt.Sprintf("[ws|%v|%v]",
+		localAddr, goraConn.RemoteAddr()))
+}
+
+func dial(wsServerAddr string, skipTls bool) (*goraws.Conn, error) {
+	dialer := *goraws.DefaultDialer
+	if skipTls {
+		dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	goraConn, _, err := dialer.Dial(wsServerAddr, nil)
+	if err == nil {
+		log.Condf(Log, "%v connected", GenConnId(goraConn))
+	}
+	return goraConn, err
 }
 
 func Dial(wsServerAddr string) (*goraws.Conn, error) {
-	goraConn, _, err := goraws.DefaultDialer.Dial(wsServerAddr, nil)
-	return goraConn, err
+	return dial(wsServerAddr, false)
+}
+
+// TLS accepts any certificate presented by the server and any host name in that
+// certificate. In this mode, TLS is susceptible to man-in-the-middle attacks.
+// This func should be used for testing wss addr
+func DialSkipTls(wsServerAddr string) (*goraws.Conn, error) {
+	return dial(wsServerAddr, true)
 }
 
 // Wrap a connected gorilla websocket,
@@ -98,7 +117,7 @@ func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler,
 	c := &Connection{
 		conn:          goraConn,
 		OnReadHandler: onRead,
-		id:            genConnId(goraConn),
+		id:            GenConnId(goraConn),
 		createAt:      time.Now(),
 		writeChan:     make(chan []byte),
 		closedChan:    ctx.Done(),
@@ -107,7 +126,6 @@ func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler,
 	go c.writePump()
 	go c.readPump()
 	go c.onDisconnect(onDisconnect)
-	log.Condf(Log, "connection %v started", c.id)
 	return c
 }
 

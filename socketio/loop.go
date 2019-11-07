@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/daominah/gomicrokit/log"
 	"github.com/daominah/gomicrokit/socketio/protocol"
 	"github.com/daominah/gomicrokit/socketio/transport"
 )
@@ -115,7 +114,6 @@ func closeChannel(c *Channel, m *methods, args ...interface{}) error {
 func inLoop(c *Channel, m *methods) error {
 	for {
 		pkg, err := c.conn.GetMessage()
-		log.Printf("inLoop msg %v", pkg)
 		if err != nil {
 			return closeChannel(c, m, err)
 		}
@@ -174,7 +172,6 @@ func outLoop(c *Channel, m *methods) error {
 			return nil
 		}
 
-		log.Printf("outLoop msg %v", msg)
 		err := c.conn.WriteMessage(msg)
 		if err != nil {
 			return closeChannel(c, m, err)
