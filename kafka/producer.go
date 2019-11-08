@@ -45,12 +45,17 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	log.Infof("connected to kafka cluster %v", conf.BrokersList)
 	go func() {
 		for err := range p.samProducer.Errors() {
-			log.Infof("failed to write kafka msg: %#v", err)
+			errMsg := err.Err.Error()
+			if errMsg == "circuit breaker is open" {
+				errMsg = "probably you did not assign topic"
+			}
+			log.Infof("failed to write msgId %v to topic %v: %v",
+				err.Msg.Metadata, err.Msg.Topic, errMsg)
 		}
 	}()
 	go func() {
 		for sent := range p.samProducer.Successes() {
-			log.Infof("delivered msg %v to topic %v:%v:%v",
+			log.Infof("delivered msgId %v to topic %v:%v:%v",
 				sent.Metadata, sent.Topic, sent.Partition, sent.Offset)
 		}
 	}()
@@ -72,7 +77,7 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 	var err error
 	select {
 	case p.samProducer.Input() <- samMsg:
-		log.Infof("sending msg %v to %v:%v: %v",
+		log.Infof("sending msgId %v to %v:%v: %v",
 			uniqueId, samMsg.Topic, key, samMsg.Value)
 		err = nil
 	case <-time.After(1 * time.Second):
