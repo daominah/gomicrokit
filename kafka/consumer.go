@@ -150,7 +150,6 @@ func (h *ConsumerGroupHandlerImpl) Cleanup(sarama.ConsumerGroupSession) error {
 	return nil
 }
 
-// TODO: handle claimMessagesChan close while we are not reading at this time
 // each assigned partition will run this func in a goroutine
 func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
 	session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
@@ -235,6 +234,7 @@ func (c Consumer) ReadMessage(timeout time.Duration) (*Message, error) {
 	}
 }
 
+// unused function
 func (c *Consumer) Close() {
 	c.closed = true
 	if c.cancelFunc != nil {
@@ -243,7 +243,6 @@ func (c *Consumer) Close() {
 	if c.client != nil {
 		log.Debugf("consumer_Close cp1")
 		err := c.client.Close()
-		// TODO: hanging here
 		log.Debugf("error when close client: %v", err)
 	}
 	log.Debugf("consumer_Close cp2")

@@ -59,7 +59,6 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 				sent.Metadata, sent.Topic, sent.Partition, sent.Offset)
 		}
 	}()
-	// TODO: check if disconnect
 	return p, nil
 }
 
