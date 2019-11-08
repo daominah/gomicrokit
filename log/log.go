@@ -158,3 +158,45 @@ func Condf(cond bool, template string, args ...interface{}) {
 		GlobalLogger.Debugf(template, args...)
 	}
 }
+
+// StdLogger is compatible with the standard library logger,
+// This logger call the GlobalLogger funcs
+type StdLogger struct{}
+
+func padArgs(args []interface{}) []interface{} {
+	if len(args) <= 1 {
+		return args
+	}
+	newArgs := make([]interface{}, 2*len(args)-1)
+	for i, e := range args {
+		newArgs[2*i] = e
+		if i != len(args)-1 {
+			newArgs[2*i+1] = " "
+		}
+	}
+	return newArgs
+}
+
+func (l StdLogger) Print(args ...interface{}) {
+	GlobalLogger.Info(padArgs(args)...)
+}
+
+func (l StdLogger) Println(args ...interface{}) {
+	GlobalLogger.Info(padArgs(args)...)
+}
+
+func (l StdLogger) Printf(template string, args ...interface{}) {
+	GlobalLogger.Infof(template, args...)
+}
+
+func (l *StdLogger) Fatal(v ...interface{}) {
+	GlobalLogger.Fatal(padArgs(v)...)
+}
+
+func (l *StdLogger) Fatalln(v ...interface{}) {
+	GlobalLogger.Fatal(padArgs(v)...)
+}
+
+func (l *StdLogger) Fatalf(format string, v ...interface{}) {
+	GlobalLogger.Fatalf(format, v...)
+}

@@ -3,8 +3,6 @@ package kafka
 import (
 	"context"
 	"fmt"
-	golog "log"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -59,7 +57,6 @@ type Consumer struct {
 }
 
 func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
-	sarama.Logger = golog.New(os.Stdout, "[sarama] ", golog.LstdFlags)
 	log.Infof("creating a consumer from %#v", conf)
 	// construct sarama config
 	kafkaVersion, err := sarama.ParseKafkaVersion("1.1.1")
