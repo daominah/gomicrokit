@@ -1,4 +1,4 @@
-package genpasswd
+package password
 
 import (
 	"math/rand"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/daominah/gomicrokit/maths"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -25,7 +26,7 @@ func init() {
 	}
 }
 
-func GenPassword(lenPasswd int) string {
+func GenRandomPassword(lenPasswd int) string {
 	if lenPasswd < 4 {
 		lenPasswd = 4
 	}
@@ -42,4 +43,20 @@ func GenPassword(lenPasswd int) string {
 		}
 	}
 	return strings.Join(password, "")
+}
+
+func HashPassword(plain string) string {
+	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.MinCost)
+	if err != nil {
+		return ""
+	}
+	return string(hash)
+}
+
+func CheckHashPassword(hashed string, plain string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashed), []byte(plain))
+	if err != nil {
+		return false
+	}
+	return true
 }
