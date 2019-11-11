@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strconv"
 	"time"
-
 	"encoding/json"
 
 	"github.com/daominah/gomicrokit/log"
