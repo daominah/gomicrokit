@@ -10,4 +10,4 @@ profile*.pdf
 
 
 # executables
-examples/testcmd/testcmd.go
+_examples/testcmd/testcmd.go
