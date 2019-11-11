@@ -9,5 +9,6 @@
 profile*.pdf
 
 
-# executables
+#
 _examples/testcmd/testcmd.go
+auth/genrsa/key.*

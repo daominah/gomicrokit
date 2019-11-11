@@ -3,6 +3,7 @@ package genpasswd
 import (
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/daominah/gomicrokit/maths"
 )
@@ -16,6 +17,7 @@ var (
 )
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	for _, chars := range [][]string{lowers, uppers, digits, symbols} {
 		for _, char := range chars {
 			allChars = append(allChars, char)
