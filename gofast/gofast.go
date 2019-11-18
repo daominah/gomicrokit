@@ -2,7 +2,10 @@ package gofast
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+
+	errors2 "github.com/pkg/errors"
 )
 
 var (
@@ -16,7 +19,7 @@ var (
 func CopySameFields(d interface{}, s interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = ErrUnexpected
+			err = errors2.Wrap(err, fmt.Sprintf("%v", r))
 		}
 	}()
 	if reflect.ValueOf(d).Kind() != reflect.Ptr {

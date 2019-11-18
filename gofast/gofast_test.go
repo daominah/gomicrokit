@@ -21,6 +21,8 @@ func TestCopySameFields(t *testing.T) {
 		F3 bool
 		F4 int
 	}
+
+	// fail
 	s := S{F1: 1, F2: "f2", F3: true, F5: "f5"}
 	var d1 D1
 	err := CopySameFields(d1, s)
@@ -31,6 +33,8 @@ func TestCopySameFields(t *testing.T) {
 	if err != ErrSourceNil {
 		t.Error(err)
 	}
+
+	// success
 	err = CopySameFields(&d1, s)
 	if err != nil {
 		t.Error(err)
@@ -39,6 +43,15 @@ func TestCopySameFields(t *testing.T) {
 	if d1 != expectD1 {
 		t.Error(d1, expectD1)
 	}
+
+	err = CopySameFields(&d1, &s)
+	if err != nil {
+		t.Error(err)
+	}
+	if d1 != expectD1 {
+		t.Error(d1, expectD1)
+	}
+
 	var d2 D2
 	err = CopySameFields(&d2, s)
 	if err != nil {
