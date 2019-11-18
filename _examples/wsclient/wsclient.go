@@ -11,16 +11,16 @@ import (
 func main() {
 	websocket.Log = true
 	websocket.SetWebsocketConfig(
-		2*time.Second, 5*time.Second, 4*time.Second, 65536)
+		60*time.Second, 60*time.Second, 25*time.Second, 65536)
 
-	for k := 0; k < 3; k++ {
+	for k := 0; k < 3000; k++ {
 		goraConn, err := websocket.Dial("ws://127.0.0.1:8000/")
 		if err != nil {
 			log.Infof("error when ws dial: %v", err)
 			continue
 		}
 		conn := websocket.NewConnection(goraConn, nil, nil)
-		for i := 0; i < 3; i++ {
+		for i := 0; i < -3; i++ {
 			go func(m int) {
 				conn.Write(fmt.Sprintf("%v", m))
 			}(10*k + i)

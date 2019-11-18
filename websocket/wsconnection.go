@@ -14,7 +14,7 @@ import (
 // whether to log every ws message
 var Log = true
 var wscfg = wsConfig{
-	WriteWait:         10 * time.Second,
+	WriteWait:         60 * time.Second,
 	PongWait:          60 * time.Second,
 	PingPeriod:        25 * time.Second,
 	LimitMessageBytes: 65536,
