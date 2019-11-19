@@ -105,11 +105,26 @@ func ReadJson(r *http.Request, outPtr interface{}) error {
 	return err
 }
 
+// return URL parameters from a http request as a map
+// ex: path `/match/:id` has param `id`
+func GetUrlParams(r *http.Request) map[string]string {
+	params := httprouter.ParamsFromContext(r.Context())
+	result := make(map[string]string, len(params))
+	if len(params) == 0 {
+		return result
+	}
+	for _, param := range params {
+		result[param.Key] = param.Value
+	}
+	return result
+}
+
 func ExampleHandler() http.HandlerFunc {
 	// thing := initHandler() // one-time per-handler initialisation
 	return func(w http.ResponseWriter, r *http.Request) {
 		var request struct{ Field0 string }
 		_ = ReadJson(r, &request)
+		_ = GetUrlParams(r)
 		WriteJson(w, r, map[string]string{"Error": "", "Data": "PONG"})
 	}
 }
