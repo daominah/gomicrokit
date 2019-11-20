@@ -1,5 +1,5 @@
 # Gomicrokit
-Usually used package for microservices
+Often used package for microservices
 
 
 ### Packages
@@ -30,7 +30,7 @@ Depend on [go.uber.org/zap](https://github.com/uber-go/zap)
 and [natefinch/lumberjack](https://github.com/natefinch/lumberjack)
 
 ##### `socketio`
-It is recommend to use websocket (standardized by ietf) instead.  
+It is recommend to use websocket (standardized by IETF) instead.  
 Modified from [graarh/golang-socketio](https://github.com/graarh/golang-socketio)
 
 ##### `websocket`
