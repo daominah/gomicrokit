@@ -5,27 +5,32 @@ import (
 
 )
 
+// Cron should be inited and run by calling NewCron
 type Cron struct {
-	job func()
-	// ex: remainder = 7 hours, interval = 24 hours: the job will be executed
-	// at 7 a.m. everyday
+	job       func()
 	interval  time.Duration
 	remainder time.Duration
 	lastJob   time.Time
 	ticker    *time.Ticker
 }
 
-// periodically execute the job in a goroutine at specific time
+// Cron periodically executes the job in a goroutine at specific time.
+// Example: remainder = 7 hours, interval = 24 hours: the job will be executed
+// at 7 a.m. everyday (executed time point accuracy is interval / 100).
+// Any function can be wrap: job = func(){yourFunc(args...)}
 func NewCron(job func(), interval time.Duration, remainder time.Duration) *Cron {
+	// initialize cron obj
 	c := &Cron{
 		job:       job,
 		interval:  interval,
 		remainder: remainder,
 	}
 	c.lastJob = time.Now().Add(-c.remainder).Truncate(interval).Add(c.remainder)
+
+	// run
 	tick := 1 * time.Second
-	if tick > interval/100 {
-		tick = interval / 100
+	if tick > c.interval/100 {
+		tick = c.interval / 100
 	}
 	c.ticker = time.NewTicker(tick)
 	go func() {
@@ -35,9 +40,9 @@ func NewCron(job func(), interval time.Duration, remainder time.Duration) *Cron 
 			if now.Sub(c.lastJob) < c.interval {
 				continue
 			}
-			go job()
+			go c.job()
 			//log.Debugf("execute a job %#v at %v", job, now.Format(time.RFC3339Nano))
-			c.lastJob = now.Add(-c.remainder).Truncate(interval).Add(c.remainder)
+			c.lastJob = now.Add(-c.remainder).Truncate(c.interval).Add(c.remainder)
 		}
 	}()
 	return c
