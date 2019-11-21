@@ -13,6 +13,9 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+// whether to log all pairs of request/response
+var LOG = true
+
 // Server should be constructed by calling func NewServer, then be embedded.
 // Example usage in `_examples/httpsvr/httpsvr.go`
 type Server struct {
@@ -62,7 +65,7 @@ func (l httpLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	requestId := maths.GenUUID()[:8]
-	log.Infof("request %v from %v: %v %v%v %v",
+	log.Condf(LOG, "request %v from %v: %v %v%v %v",
 		requestId, r.RemoteAddr, r.Method, r.URL.Path, query, string(reqBodyBytes))
 
 	ctx := context.WithValue(r.Context(), ctxRequestId, requestId)
@@ -86,12 +89,12 @@ func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) {
 		return
 	}
 	requestId := r.Context().Value(ctxRequestId)
-	log.Infof("respond %v successfully: %v", requestId, bodyS)
+	log.Condf(LOG, "respond %v successfully: %v", requestId, bodyS)
 }
 
 func WriteErr(w http.ResponseWriter, r *http.Request, code int, err string) {
 	requestId := r.Context().Value(ctxRequestId)
-	log.Infof("respond %v: code: %v, error: %v", requestId, code, err)
+	log.Condf(LOG, "respond %v: code: %v, error: %v", requestId, code, err)
 	http.Error(w, err, code)
 }
 

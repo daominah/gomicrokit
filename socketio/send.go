@@ -3,9 +3,10 @@ package socketio
 import (
 	"encoding/json"
 	"errors"
-	"github.com/daominah/gomicrokit/socketio/protocol"
-	"log"
 	"time"
+
+	"github.com/daominah/gomicrokit/log"
+	"github.com/daominah/gomicrokit/socketio/protocol"
 )
 
 var (
@@ -20,7 +21,7 @@ func send(msg *protocol.Message, c *Channel, args interface{}) error {
 	//preventing json/encoding "index out of range" panic
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("socket.io send panic: ", r)
+			log.Infof("socket.io send panic: ", r)
 		}
 	}()
 

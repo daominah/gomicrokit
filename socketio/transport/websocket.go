@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var LOG = true
+
 const (
 	upgradeFailed = "Upgrade failed: "
 
@@ -53,7 +55,7 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 		return "", ErrorBadBuffer
 	}
 	text := string(data)
-	log.Condf(myws.Log, "received a message from %v: %v", wsc.id, text)
+	log.Condf(LOG, "received a message from %v: %v", wsc.id, text)
 
 	//empty messages are not allowed
 	if len(text) == 0 {
@@ -73,7 +75,7 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	if _, err := writer.Write([]byte(message)); err != nil {
 		return err
 	}
-	log.Condf(myws.Log, "wrote to %v msg: %v", wsc.id, message)
+	log.Condf(LOG, "wrote to %v msg: %v", wsc.id, message)
 	if err := writer.Close(); err != nil {
 		return err
 	}
@@ -107,7 +109,7 @@ func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) 
 		return nil, err
 	}
 	connId := myws.GenConnId(socket)
-	log.Condf(myws.Log, "%v connected", connId)
+	log.Condf(LOG, "%v connected", connId)
 	return &WebsocketConnection{socket: socket, transport: wst, id: connId}, nil
 }
 
@@ -125,7 +127,7 @@ func (wst *WebsocketTransport) HandleConnection(
 		return nil, ErrorHttpUpgradeFailed
 	}
 	connId := myws.GenConnId(socket)
-	log.Condf(myws.Log, "%v connected", connId)
+	log.Condf(LOG, "%v connected", connId)
 	return &WebsocketConnection{socket: socket, transport: wst, id: connId}, nil
 }
 

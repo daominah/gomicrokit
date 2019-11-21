@@ -27,7 +27,7 @@ type Producer struct {
 }
 
 func NewProducer(conf ProducerConfig) (*Producer, error) {
-	log.Infof("creating a producer from %#v", conf)
+	log.Infof("creating a producer with %#v", conf)
 	// construct sarama config
 	samConf := sarama.NewConfig()
 	samConf.Producer.RequiredAcks = sarama.WaitForLocal
@@ -55,7 +55,7 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	}()
 	go func() {
 		for sent := range p.samProducer.Successes() {
-			log.Infof("delivered msgId %v to topic %v:%v:%v",
+			log.Condf(LOG,"delivered msgId %v to topic %v:%v:%v",
 				sent.Metadata, sent.Topic, sent.Partition, sent.Offset)
 		}
 	}()
@@ -76,7 +76,7 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 	var err error
 	select {
 	case p.samProducer.Input() <- samMsg:
-		log.Infof("sending msgId %v to %v:%v: %v",
+		log.Condf(LOG,"sending msgId %v to %v:%v: %v",
 			uniqueId, samMsg.Topic, key, samMsg.Value)
 		err = nil
 	case <-time.After(1 * time.Second):

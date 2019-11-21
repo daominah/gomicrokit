@@ -155,7 +155,7 @@ func Printf(template string, args ...interface{}) {
 
 func Condf(cond bool, template string, args ...interface{}) {
 	if cond {
-		GlobalLogger.Debugf(template, args...)
+		GlobalLogger.Infof(template, args...)
 	}
 }
 

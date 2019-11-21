@@ -12,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var LOG = true
+
 type Offset int64
 
 const (
@@ -57,7 +59,7 @@ type Consumer struct {
 }
 
 func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
-	log.Infof("creating a consumer from %#v", conf)
+	log.Infof("creating a consumer with %#v", conf)
 	// construct sarama config
 	kafkaVersion, err := sarama.ParseKafkaVersion("1.1.1")
 	if err != nil {
@@ -174,7 +176,7 @@ func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
 				msg := &Message{Value: string(samMsg.Value), Offset: samMsg.Offset,
 					Topic: samMsg.Topic, Partition: samMsg.Partition,
 					Key: string(samMsg.Key), Timestamp: samMsg.Timestamp}
-				log.Infof("received a message from topic %v:%v:%v: %v",
+				log.Condf(LOG,"received a message from topic %v:%v:%v: %v",
 					msg.Topic, msg.Partition, msg.Offset, msg.Value)
 				select {
 				case readRequest.responseChan <- msg:
@@ -243,7 +245,7 @@ func (c *Consumer) Close() {
 	if c.client != nil {
 		log.Debugf("consumer_Close cp1")
 		err := c.client.Close()
-		log.Debugf("error when close client: %v", err)
+		log.Infof("error when close client: %v", err)
 	}
 	log.Debugf("consumer_Close cp2")
 }
