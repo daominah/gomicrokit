@@ -2,7 +2,6 @@ package gofast
 
 import (
 	"time"
-
 )
 
 // Cron should be inited and run by calling NewCron
@@ -35,14 +34,15 @@ func NewCron(job func(), interval time.Duration, remainder time.Duration) *Cron 
 	c.ticker = time.NewTicker(tick)
 	go func() {
 		for {
-			<-c.ticker.C
 			now := time.Now()
 			if now.Sub(c.lastJob) < c.interval {
 				continue
 			}
 			go c.job()
-			//log.Debugf("execute a job %#v at %v", job, now.Format(time.RFC3339Nano))
 			c.lastJob = now.Add(-c.remainder).Truncate(c.interval).Add(c.remainder)
+
+			// sleep for a tick duration
+			<-c.ticker.C
 		}
 	}()
 	return c
