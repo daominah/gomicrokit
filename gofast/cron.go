@@ -24,7 +24,7 @@ func NewCron(job func(), interval time.Duration, remainder time.Duration) *Cron 
 		interval:  interval,
 		remainder: remainder,
 	}
-	c.lastJob = time.Now().Add(-c.remainder).Truncate(interval).Add(c.remainder)
+	c.lastJob = time.Now().Add(-c.remainder).Truncate(c.interval).Add(c.remainder)
 
 	// run
 	tick := 1 * time.Second
@@ -35,12 +35,11 @@ func NewCron(job func(), interval time.Duration, remainder time.Duration) *Cron 
 	go func() {
 		for {
 			now := time.Now()
-			if now.Sub(c.lastJob) < c.interval {
-				continue
+			if now.Sub(c.lastJob) >= c.interval {
+				go c.job()
+				c.lastJob = now.Add(-c.remainder).Truncate(c.interval).
+					Add(c.remainder)
 			}
-			go c.job()
-			c.lastJob = now.Add(-c.remainder).Truncate(c.interval).Add(c.remainder)
-
 			// sleep for a tick duration
 			<-c.ticker.C
 		}
