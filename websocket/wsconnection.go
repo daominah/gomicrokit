@@ -13,6 +13,8 @@ import (
 
 // whether to log every ws message
 var LOG = true
+
+// wscfg is this package global config for reading and writing messages
 var wscfg = wsConfig{
 	WriteWait:         60 * time.Second,
 	PongWait:          60 * time.Second,
@@ -33,6 +35,7 @@ type wsConfig struct {
 	LimitMessageBytes int64
 }
 
+// change the config of this package for reading and writing messages
 func SetWebsocketConfig(writeWait time.Duration, pongWait time.Duration,
 	pingPeriod time.Duration, limitMessageBytes int64) {
 	wscfg.WriteWait = writeWait
@@ -41,35 +44,11 @@ func SetWebsocketConfig(writeWait time.Duration, pongWait time.Duration,
 	wscfg.LimitMessageBytes = limitMessageBytes
 }
 
+// ConnectionId is anything unique for each connection object
 type ConnectionId string
 
-type OnReadHandler interface {
-	// Handle will be called in goroutine when conn received a msg from remote
-	Handle(cid ConnectionId, msg string)
-}
-
-// emptyHandler does nothing
-type emptyHandler struct{}
-
-func (h *emptyHandler) Handle(cid ConnectionId, msg string) {}
-
-// Connection wrap a gorrila_websocket_Conn
-// Should be created by calling func NewConnection.
-type Connection struct {
-	conn *goraws.Conn
-	// Handle will be called in goroutine when received a msg from remote
-	OnReadHandler OnReadHandler
-	// any unique string
-	id       ConnectionId
-	createAt time.Time
-	// using by writePump to ensure one concurrent writer.
-	writeChan chan []byte
-	// closedChan will be closed by this_notifyClosed when the conn disconnected
-	closedChan   <-chan struct{}
-	notifyClosed context.CancelFunc
-}
-
-// return same id for the same connection object
+// GenConnId generates ConnectionId by concat local and remote address,
+// the ConnectionId is unique for each active connection
 func GenConnId(goraConn *goraws.Conn) ConnectionId {
 	if goraConn == nil {
 		return ConnectionId(fmt.Sprintf("[ws|nil]"))
@@ -77,10 +56,38 @@ func GenConnId(goraConn *goraws.Conn) ConnectionId {
 	localAddr := goraConn.LocalAddr().String()
 	colon := strings.Index(localAddr, ":")
 	if colon != -1 {
+		// localAddr is only "port" instead of "ip:port"
 		localAddr = localAddr[colon:]
 	}
 	return ConnectionId(fmt.Sprintf("[ws|%v|%v]",
 		localAddr, goraConn.RemoteAddr()))
+}
+
+type OnReadHandler interface {
+	// Handle will be called in a goroutine when conn received a msg from remote.
+	// :param msgType: int, RFC 6455: TextMessage = 1, BinaryMessage = 2, ..
+	Handle(cid ConnectionId, msgType int, msg []byte)
+}
+
+// emptyHandler implements OnReadHandler, this handle does nothing
+type emptyHandler struct{}
+
+func (h *emptyHandler) Handle(cid ConnectionId, msgType int, msg []byte) {}
+
+// Connection wraps a gorrila_websocket_Conn,
+// conn_WriteBytes and conn_Write is safe for concurrent calls
+type Connection struct {
+	conn *goraws.Conn
+	// Handle will be called in goroutine when received a msg from remote
+	OnReadHandler OnReadHandler
+	id            ConnectionId
+	// writeChan is using by this_writePump to ensure one concurrent writer
+	writeChan chan []byte
+	// closedChan will be closed when this connection disconnected
+	closedChan <-chan struct{}
+	// call notifyClosed() will close the closedChan,
+	// after the first call, subsequent calls to this func do nothing
+	notifyClosed context.CancelFunc
 }
 
 func dial(wsServerAddr string, skipTls bool) (*goraws.Conn, error) {
@@ -95,21 +102,24 @@ func dial(wsServerAddr string, skipTls bool) (*goraws.Conn, error) {
 	return goraConn, err
 }
 
+// Dial creates a gorrila_websocket_Conn
 func Dial(wsServerAddr string) (*goraws.Conn, error) {
 	return dial(wsServerAddr, false)
 }
 
-// TLS accepts any certificate presented by the server and any host name in that
-// certificate. In this mode, TLS is susceptible to man-in-the-middle attacks.
-// This func should be used for testing wss addr
+// DialSkipTls creates a gorrila_websocket_Conn. Using in testing wss host.
+// This func accepts any certificate presented by the server and any host name
+// in that certificate. In this mode, TLS is susceptible to man-in-the-middle
+// attacks
 func DialSkipTls(wsServerAddr string) (*goraws.Conn, error) {
 	return dial(wsServerAddr, true)
 }
 
-// Wrap a connected gorilla websocket,
-// this_Write and this_WriteBytes is safe to use in many goroutines
-func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler,
-	onDisconnect func(*Connection)) *Connection {
+// :param goraConn: a gorrila_websocket_Conn, can be created by functions Dial
+// or DialSkipTls of this packages.
+// :param onRead: a handler, its method Handler will be called in a goroutine
+// for each received a msg from remote.
+func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler) *Connection {
 	if onRead == nil {
 		onRead = &emptyHandler{}
 	}
@@ -118,22 +128,23 @@ func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler,
 		conn:          goraConn,
 		OnReadHandler: onRead,
 		id:            GenConnId(goraConn),
-		createAt:      time.Now(),
 		writeChan:     make(chan []byte),
 		closedChan:    ctx.Done(),
 		notifyClosed:  calcel,
 	}
 	go c.writePump()
 	go c.readPump()
-	go c.onDisconnect(onDisconnect)
+	go func() {
+		<-c.closedChan
+		log.Condf(LOG, "%v disconnected", c.id)
+	}()
 	return c
 }
 
 func (c *Connection) readPump() {
 	defer func() {
-		c.conn.Close()
-		c.notifyClosed()
 		log.Condf(LOG, "read pump of %v returned", c.id)
+		c.Close()
 	}()
 	c.conn.SetReadLimit(wscfg.LimitMessageBytes)
 	c.conn.SetReadDeadline(time.Now().Add(wscfg.PongWait))
@@ -142,26 +153,23 @@ func (c *Connection) readPump() {
 		return nil
 	})
 	for {
-		_, messageB, err := c.conn.ReadMessage()
+		msgType, msg, err := c.conn.ReadMessage()
 		if err != nil {
 			log.Condf(LOG, "error when %v read message: %v", c.id, err)
 			break
 		}
-		msg := string(messageB)
-		log.Condf(LOG, "received a message from %v: %v", c.id, msg)
-		go c.OnReadHandler.Handle(c.id, msg)
+		log.Condf(LOG, "received a message from %v: %s", c.id, msg)
+		go c.OnReadHandler.Handle(c.id, msgType, msg)
 	}
 }
 
-// Ensure there is at most one writer to a connection by  executing all writes
-// from this goroutine.
+// writePump ensures there is at most one write to a connection at a moment
 func (c *Connection) writePump() {
 	ticker := time.NewTicker(wscfg.PingPeriod)
 	defer func() {
-		ticker.Stop()
-		c.conn.Close()
-		c.notifyClosed()
 		log.Condf(LOG, "write pump of %v returned", c.id)
+		ticker.Stop()
+		c.Close()
 	}()
 	for {
 		select {
@@ -180,18 +188,10 @@ func (c *Connection) writePump() {
 				log.Condf(LOG, "error when ping to %v: %v", c.id, err)
 				return
 			}
+		case <-c.closedChan:
+			return
 		}
-
 	}
-}
-
-func (c *Connection) onDisconnect(callback func(*Connection)) {
-	<-c.closedChan
-	log.Condf(LOG, "connection %v disconnected", c.id)
-	if callback == nil {
-		return
-	}
-	callback(c)
 }
 
 func (c *Connection) WriteBytes(message []byte) {
@@ -199,7 +199,9 @@ func (c *Connection) WriteBytes(message []byte) {
 	select {
 	case c.writeChan <- message:
 	case <-timeout:
-		log.Condf(LOG,"timeout when send to write chan of %v", c.id)
+		log.Condf(LOG, "timeout when send to write chan of %v", c.id)
+	case <-c.closedChan:
+		log.Condf(LOG, "write to closed connection %v", c.id)
 	}
 }
 
@@ -208,7 +210,6 @@ func (c *Connection) Write(message string) {
 }
 
 func (c *Connection) Close() {
-	log.Condf(LOG, "about to close %v", c.id)
 	c.conn.Close()
 	c.notifyClosed()
 }
