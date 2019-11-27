@@ -82,12 +82,18 @@ type Connection struct {
 	OnReadHandler OnReadHandler
 	id            ConnectionId
 	// writeChan is using by this_writePump to ensure one concurrent writer
-	writeChan chan []byte
-	// closedChan will be closed when this connection disconnected
-	closedChan <-chan struct{}
-	// call notifyClosed() will close the closedChan,
+	writeChan chan *wsMessage
+	// ClosedChan will be closed automatically when this connection disconnected,
+	// External codes only receive from this channel (do not close it).
+	ClosedChan <-chan struct{}
+	// call notifyClosed() will close the ClosedChan,
 	// after the first call, subsequent calls to this func do nothing
 	notifyClosed context.CancelFunc
+}
+
+type wsMessage struct {
+	data            []byte
+	isBinaryMessage bool
 }
 
 func dial(wsServerAddr string, skipTls bool) (*goraws.Conn, error) {
@@ -115,6 +121,8 @@ func DialSkipTls(wsServerAddr string) (*goraws.Conn, error) {
 	return dial(wsServerAddr, true)
 }
 
+// NewConnection returns a Connection object that already run the read and
+// write loop.
 // :param goraConn: a gorrila_websocket_Conn, can be created by functions Dial
 // or DialSkipTls of this packages.
 // :param onRead: a handler, its method Handler will be called in a goroutine
@@ -128,14 +136,14 @@ func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler) *Connection {
 		conn:          goraConn,
 		OnReadHandler: onRead,
 		id:            GenConnId(goraConn),
-		writeChan:     make(chan []byte),
-		closedChan:    ctx.Done(),
+		writeChan:     make(chan *wsMessage),
+		ClosedChan:    ctx.Done(),
 		notifyClosed:  calcel,
 	}
 	go c.writePump()
 	go c.readPump()
 	go func() {
-		<-c.closedChan
+		<-c.ClosedChan
 		log.Condf(LOG, "%v disconnected", c.id)
 	}()
 	return c
@@ -173,14 +181,23 @@ func (c *Connection) writePump() {
 	}()
 	for {
 		select {
-		case msgB := <-c.writeChan:
+		case wsMsg := <-c.writeChan:
 			c.conn.SetWriteDeadline(time.Now().Add(wscfg.WriteWait))
-			err := c.conn.WriteMessage(goraws.TextMessage, msgB)
+			var err error
+			if wsMsg.isBinaryMessage {
+				err = c.conn.WriteMessage(goraws.BinaryMessage, wsMsg.data)
+			} else {
+				err = c.conn.WriteMessage(goraws.TextMessage, wsMsg.data)
+			}
 			if err != nil {
 				log.Condf(LOG, "error when write to %v: %v", c.id, err)
 				return
 			}
-			log.Condf(LOG, "wrote to %v msg: %v", c.id, string(msgB))
+			tmpl := "wrote to %v msg: %v"
+			if wsMsg.isBinaryMessage {
+				tmpl = "wrote to %v msg: %s"
+			}
+			log.Condf(LOG, tmpl, c.id, wsMsg.data)
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(wscfg.WriteWait))
 			err := c.conn.WriteMessage(goraws.PingMessage, nil)
@@ -188,28 +205,51 @@ func (c *Connection) writePump() {
 				log.Condf(LOG, "error when ping to %v: %v", c.id, err)
 				return
 			}
-		case <-c.closedChan:
+		case <-c.ClosedChan:
 			return
 		}
 	}
 }
 
-func (c *Connection) WriteBytes(message []byte) {
+func (c *Connection) writeBytes(message []byte, isBinMsg bool) {
 	timeout := time.After(3 * time.Second)
 	select {
-	case c.writeChan <- message:
+	case c.writeChan <- &wsMessage{data: message, isBinaryMessage: isBinMsg}:
+		// pass
 	case <-timeout:
-		log.Condf(LOG, "timeout when send to write chan of %v", c.id)
-	case <-c.closedChan:
+		log.Condf(LOG, "timed out when send to write chan of %v", c.id)
+	case <-c.ClosedChan:
 		log.Condf(LOG, "write to closed connection %v", c.id)
 	}
 }
 
-func (c *Connection) Write(message string) {
-	c.WriteBytes([]byte(message))
+// send a BinaryMessage to remote
+func (c *Connection) WriteBytes(message []byte) {
+	c.writeBytes([]byte(message), true)
 }
 
+// send a TextMessage to remote
+func (c *Connection) Write(message string) {
+	c.writeBytes([]byte(message), false)
+}
+
+// Close closes the connection without sending or waiting for a close message
 func (c *Connection) Close() {
 	c.conn.Close()
 	c.notifyClosed()
+}
+
+// CheckIsClosed returns true if the connection is disconnected
+func (c *Connection) CheckIsClosed() bool {
+	select {
+	case <-c.ClosedChan:
+		return true
+	default:
+		return false
+	}
+}
+
+// return the ConnectionId
+func (c *Connection) GetId() ConnectionId {
+	return c.id
 }

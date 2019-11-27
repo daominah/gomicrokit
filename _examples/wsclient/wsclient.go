@@ -22,13 +22,17 @@ func main() {
 				return
 			}
 			conn := websocket.NewConnection(goraConn, nil)
-			for i := 0; i < 5; i++ {
+			for i := 0; i < 4; i++ {
 				time.Sleep(1 * time.Second)
-				if i == 3 {
+				if i == 2 {
 					conn.Close()
 				} else {
 					go func(i10k int) {
-						conn.Write(fmt.Sprintf("%v", i10k))
+						if k%2 == 0 {
+							conn.Write(fmt.Sprintf("%v", i10k))
+						} else {
+							conn.WriteBytes([]byte(fmt.Sprintf("%v", i10k)))
+						}
 					}(10*k + i)
 				}
 			}
