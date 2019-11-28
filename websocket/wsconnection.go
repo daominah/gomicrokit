@@ -125,8 +125,8 @@ func DialSkipTls(wsServerAddr string) (*goraws.Conn, error) {
 // write loop.
 // :param goraConn: a gorrila_websocket_Conn, can be created by functions Dial
 // or DialSkipTls of this packages.
-// :param onRead: a handler, its method Handler will be called in a goroutine
-// for each received a msg from remote.
+// :param onRead: a handler, its Handle method will be called in a goroutine
+// for each received msg from remote.
 func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler) *Connection {
 	if onRead == nil {
 		onRead = &emptyHandler{}
