@@ -61,3 +61,32 @@ func TestCopySameFields(t *testing.T) {
 		t.Error()
 	}
 }
+
+func TestCheckNilInterface(t *testing.T) {
+	type MyStruct struct{ Name string }
+
+	var nilStructPtr *MyStruct
+	myStruct := MyStruct{Name: "Name0"}
+	var nilErr error
+	var nilStringPtr *string
+	var str string = "pussy"
+	var nilSclice []int
+	initedSclice := []int{1, 2}
+
+	for i, c := range []struct {
+		x      interface{}
+		expect bool
+	}{
+		{nilStructPtr, true},
+		{myStruct, false},
+		{nilErr, true},
+		{nilStringPtr, true},
+		{str, false},
+		{nilSclice, true},
+		{initedSclice, false},
+	} {
+		if isNil := checkNilInterface(c.x, false); isNil != c.expect {
+			t.Error(i, c.x, isNil)
+		}
+	}
+}

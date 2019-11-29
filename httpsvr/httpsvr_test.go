@@ -11,6 +11,7 @@ import (
 func TestHttp(t *testing.T) {
 	s := NewServer()
 	handler := httpLogger{s.router}
+	LOG = false
 
 	// handle 0
 	s.AddHandler("GET", "/", ExampleHandler())

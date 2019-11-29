@@ -45,3 +45,33 @@ func CopySameFields(d interface{}, s interface{}) (err error) {
 	}
 	return nil
 }
+
+func checkNilInterface(x interface{}, isDebug bool) (result bool) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			result = false
+		}
+		if isDebug {
+			fmt.Printf(
+				"result: %-5v, x==nil: %-5v, panic: %-5v, x: %v(%T)\n",
+				result, x == nil, r != nil, x, x)
+		}
+	}()
+	if x == nil {
+		// only untyped nil (ex: nil error) return here
+		return true
+	}
+	if reflect.ValueOf(x).IsNil() {
+		// panic if x is not chan, func, interface, map, pointer, or slice
+		return true
+	}
+	return false
+}
+
+// Problem: `x == nil` still returns true if x is a nil struct pointer,
+// checkNilInterface will return false in above case,
+// more examples are in `reflect_test.go`
+func CheckNilInterface(x interface{}) (result bool) {
+	return checkNilInterface(x, false)
+}
