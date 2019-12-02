@@ -20,9 +20,9 @@ var GlobalLogger *zap.SugaredLogger = NewLogger(NewConfigFromEnv())
 type Config struct {
 	// default log level is debug
 	IsLogLevelInfo bool
-	// default log to stderr
+	// default log to stdout
 	LogFilePath string
-	// whether to log simultaneously to both stderr and file
+	// whether to log simultaneously to both stdout and file
 	IsNotLogBoth bool
 	// whether to rotate log file at midnight
 	IsNotLogRotate bool
@@ -34,7 +34,7 @@ func NewConfigFromEnv() Config {
 	var c Config
 	c.IsLogLevelInfo, _ = strconv.ParseBool(os.Getenv("LOG_LEVEL_INFO"))
 	c.LogFilePath = os.Getenv("LOG_FILE_PATH")
-	c.IsNotLogBoth, _ = strconv.ParseBool(os.Getenv("LOG_NOT_STDERR"))
+	c.IsNotLogBoth, _ = strconv.ParseBool(os.Getenv("LOG_NOT_STDOUT"))
 	c.IsNotLogRotate, _ = strconv.ParseBool(os.Getenv("LOG_NOT_ROTATE"))
 	c.RotateInterval = 24 * time.Hour
 	return c
@@ -46,7 +46,7 @@ func NewLogger(conf Config) *zap.SugaredLogger {
 	encoder := zapcore.NewConsoleEncoder(encoderConf)
 
 	var writers []zapcore.WriteSyncer
-	stdWriter, _, _ := zap.Open("stderr")
+	stdWriter, _, _ := zap.Open("stdout")
 	if conf.LogFilePath == "" {
 		writers = []zapcore.WriteSyncer{stdWriter}
 	} else {
