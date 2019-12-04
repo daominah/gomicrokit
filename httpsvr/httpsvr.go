@@ -72,6 +72,20 @@ func (l httpLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// Write includes logging,
+// input r is the corresponding request of the response
+func Write(w http.ResponseWriter, r *http.Request, bodyB []byte) {
+	_, err := w.Write(bodyB)
+	bodyS := string(bodyB)
+	if err != nil {
+		errMsg := fmt.Sprintf("error when writer write: %v, %v", err, bodyS)
+		WriteErr(w, r, http.StatusInternalServerError, errMsg)
+		return
+	}
+	requestId := r.Context().Value(ctxRequestId)
+	log.Condf(LOG, "respond %v successfully: %v", requestId, bodyS)
+}
+
 // WriteJson includes logging,
 // input r is the corresponding request of the response
 func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) {
@@ -81,15 +95,7 @@ func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) {
 		WriteErr(w, r, http.StatusInternalServerError, errMsg)
 		return
 	}
-	_, err = w.Write(bodyB)
-	bodyS := string(bodyB)
-	if err != nil {
-		errMsg := fmt.Sprintf("error when writer write: %v, %v", err, bodyS)
-		WriteErr(w, r, http.StatusInternalServerError, errMsg)
-		return
-	}
-	requestId := r.Context().Value(ctxRequestId)
-	log.Condf(LOG, "respond %v successfully: %v", requestId, bodyS)
+	Write(w, r, bodyB)
 }
 
 func WriteErr(w http.ResponseWriter, r *http.Request, code int, err string) {
