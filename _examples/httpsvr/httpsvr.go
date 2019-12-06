@@ -20,6 +20,7 @@ func (s *Server) Route() {
 	s.AddHandler("GET", "/", s.index())
 	s.AddHandler("GET", "/admin", s.auth(s.hello()))
 	s.AddHandler("GET", "/error", httpsvr.ExampleHandlerError())
+	s.AddHandler("GET", "/exception", s.exception())
 }
 
 func (s *Server) index() http.HandlerFunc {
@@ -48,6 +49,14 @@ func (s Server) auth(handle http.HandlerFunc) http.HandlerFunc {
 		userName := words[1]
 		ctx := context.WithValue(r.Context(), "user", userName)
 		handle(w, r.WithContext(ctx))
+	}
+}
+
+func (s *Server) exception() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var b *float64
+		a := 1 / *b
+		httpsvr.WriteJson(w, r, map[string]float64{"a": a})
 	}
 }
 
