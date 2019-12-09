@@ -88,6 +88,7 @@ type TimedRotatingWriter struct {
 func NewTimedRotatingWriter(base *lumberjack.Logger, interval time.Duration) *TimedRotatingWriter {
 	w := &TimedRotatingWriter{Logger: base, interval: interval}
 	w.mutex.Lock()
+	w.Logger.Rotate()
 	w.lastRotated = time.Now().Truncate(interval)
 	w.mutex.Unlock()
 	return w
