@@ -74,11 +74,11 @@ type OnCloseHandler interface {
 	OnClose(cid ConnectionId)
 }
 
-// emptyHandler implements OnReadHandler, this handle does nothing
-type emptyHandler struct{}
+// EmptyHandler implements OnReadHandler, this handle does nothing
+type EmptyHandler struct{}
 
-func (h emptyHandler) Handle(cid ConnectionId, msgType int, msg []byte) {}
-func (h emptyHandler) OnClose(cid ConnectionId)                         {}
+func (h EmptyHandler) Handle(cid ConnectionId, msgType int, msg []byte) {}
+func (h EmptyHandler) OnClose(cid ConnectionId)                         {}
 
 // Connection wraps a gorrila_websocket_Conn,
 // conn_WriteBytes and conn_Write is safe for concurrent calls
@@ -135,7 +135,7 @@ func DialSkipTls(wsServerAddr string) (*goraws.Conn, error) {
 // for each received msg from remote.
 func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler) *Connection {
 	if onRead == nil {
-		onRead = &emptyHandler{}
+		onRead = &EmptyHandler{}
 	}
 	ctx, cxl := context.WithCancel(context.Background())
 	c := &Connection{
