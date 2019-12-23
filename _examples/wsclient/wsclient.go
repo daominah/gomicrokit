@@ -16,7 +16,7 @@ func main() {
 	// k is number of connections to create
 	for k := 0; k < 2; k++ {
 		go func(k int) {
-			goraConn, err := websocket.Dial("ws://127.0.0.1:8000/")
+			goraConn, err := websocket.Dial("ws://127.0.0.1:8001/ws")
 			if err != nil {
 				log.Infof("error when ws dial: %v", err)
 				return

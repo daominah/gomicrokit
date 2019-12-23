@@ -69,10 +69,16 @@ type OnReadHandler interface {
 	Handle(cid ConnectionId, msgType int, msg []byte)
 }
 
+type OnCloseHandler interface {
+	// OnClose will be called after conn closed
+	OnClose(cid ConnectionId)
+}
+
 // emptyHandler implements OnReadHandler, this handle does nothing
 type emptyHandler struct{}
 
-func (h *emptyHandler) Handle(cid ConnectionId, msgType int, msg []byte) {}
+func (h emptyHandler) Handle(cid ConnectionId, msgType int, msg []byte) {}
+func (h emptyHandler) OnClose(cid ConnectionId)                         {}
 
 // Connection wraps a gorrila_websocket_Conn,
 // conn_WriteBytes and conn_Write is safe for concurrent calls
@@ -131,14 +137,14 @@ func NewConnection(goraConn *goraws.Conn, onRead OnReadHandler) *Connection {
 	if onRead == nil {
 		onRead = &emptyHandler{}
 	}
-	ctx, calcel := context.WithCancel(context.Background())
+	ctx, cxl := context.WithCancel(context.Background())
 	c := &Connection{
 		conn:          goraConn,
 		OnReadHandler: onRead,
 		id:            GenConnId(goraConn),
 		writeChan:     make(chan *wsMessage),
 		ClosedChan:    ctx.Done(),
-		notifyClosed:  calcel,
+		notifyClosed:  cxl,
 	}
 	go c.writePump()
 	go c.readPump()
