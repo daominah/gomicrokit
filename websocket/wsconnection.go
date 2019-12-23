@@ -199,11 +199,7 @@ func (c *Connection) writePump() {
 				log.Condf(LOG, "error when write to %v: %v", c.id, err)
 				return
 			}
-			tmpl := "wrote to %v msg: %v"
-			if wsMsg.isBinaryMessage {
-				tmpl = "wrote to %v msg: %s"
-			}
-			log.Condf(LOG, tmpl, c.id, wsMsg.data)
+			log.Condf(LOG, "wrote to %v msg: %s", c.id, wsMsg.data)
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(wscfg.WriteWait))
 			err := c.conn.WriteMessage(goraws.PingMessage, nil)
