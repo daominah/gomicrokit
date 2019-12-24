@@ -10,23 +10,21 @@ import (
 )
 
 type Server struct {
-	listeningPort    string
-	wsPath           string
-	HttpRouter       *httpsvr.Server
-	WsOnReadHandler  OnReadHandler
-	WsOnCloseHandler OnCloseHandler
-	Connections      map[ConnectionId]*Connection
-	Mutex            sync.Mutex
+	listeningPort string
+	wsPath        string
+	HttpRouter    *httpsvr.Server
+	Handler       ServerHandler
+	Connections   map[ConnectionId]*Connection
+	Mutex         sync.Mutex
 }
 
 func NewServer(listeningPort string, wsPath string) *Server {
 	s := &Server{
-		listeningPort:    listeningPort,
-		wsPath:           wsPath,
-		Connections:      make(map[ConnectionId]*Connection),
-		HttpRouter:       httpsvr.NewServer(),
-		WsOnReadHandler:  EmptyHandler{},
-		WsOnCloseHandler: EmptyHandler{},
+		listeningPort: listeningPort,
+		wsPath:        wsPath,
+		HttpRouter:    httpsvr.NewServer(),
+		Connections:   make(map[ConnectionId]*Connection),
+		Handler:       &EmptyHandler{},
 	}
 	s.HttpRouter.AddHandler("GET", wsPath, s.handleUpgradeWs())
 	return s
@@ -47,17 +45,18 @@ func (s *Server) handleUpgradeWs() http.HandlerFunc {
 			return
 		}
 		s.Mutex.Lock()
-		conn := NewConnection(goraConn, s.WsOnReadHandler)
+		conn := NewConnection(goraConn, s.Handler)
 		s.Connections[conn.id] = conn
 		s.Mutex.Unlock()
 		log.Condf(LOG, "%v connected", conn.id)
+		go s.Handler.OnOpen(conn.id, r)
 		go func() {
 			<-conn.ClosedChan
 			s.Mutex.Lock()
 			delete(s.Connections, conn.id)
 			s.Mutex.Unlock()
 			log.Condf(LOG, "%v disconnected", conn.id)
-			s.WsOnCloseHandler.OnClose(conn.id)
+			go s.Handler.OnClose(conn.id)
 		}()
 	}
 }

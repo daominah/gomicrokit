@@ -13,8 +13,7 @@ func main() {
 		60*time.Second, 60*time.Second, 25*time.Second, 65536)
 
 	server := websocket.NewServer(":8001", "/ws")
-	server.WsOnReadHandler = websocket.EmptyHandler{}
-	server.WsOnCloseHandler = websocket.EmptyHandler{}
+	server.Handler = websocket.EmptyHandler{}
 
 	err := server.ListenAndServe()
 	if err != nil {

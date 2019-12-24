@@ -10,5 +10,5 @@ profile*.pdf
 
 
 #
-_examples/testcmd/testcmd.go
+a_examples/testcmd/testcmd.go
 auth/genrsa/key.*

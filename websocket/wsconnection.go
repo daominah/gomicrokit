@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -69,16 +70,20 @@ type OnReadHandler interface {
 	Handle(cid ConnectionId, msgType int, msg []byte)
 }
 
-type OnCloseHandler interface {
-	// OnClose will be called after conn closed
+type ServerHandler interface {
+	OnReadHandler
+	// OnOpen will be called after a client connected to the server
+	OnOpen(cid ConnectionId, initHttpReq *http.Request)
+	// OnClose will be called after a connection disconnected
 	OnClose(cid ConnectionId)
 }
 
 // EmptyHandler implements OnReadHandler, this handle does nothing
 type EmptyHandler struct{}
 
-func (h EmptyHandler) Handle(cid ConnectionId, msgType int, msg []byte) {}
-func (h EmptyHandler) OnClose(cid ConnectionId)                         {}
+func (h EmptyHandler) OnOpen(cid ConnectionId, initHttpReq *http.Request) {}
+func (h EmptyHandler) Handle(cid ConnectionId, msgType int, msg []byte)   {}
+func (h EmptyHandler) OnClose(cid ConnectionId)                           {}
 
 // Connection wraps a gorrila_websocket_Conn,
 // conn_WriteBytes and conn_Write is safe for concurrent calls
