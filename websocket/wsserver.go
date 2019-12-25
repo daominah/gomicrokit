@@ -104,3 +104,11 @@ func (s *Server) WriteBytesAll(message []byte) {
 	}
 	s.Mutex.Unlock()
 }
+
+// GetConnection can return nil
+func (s *Server) GetConnection(connId ConnectionId) *Connection {
+	s.Mutex.Lock()
+	conn := s.Connections[connId]
+	s.Mutex.Unlock()
+	return conn
+}
