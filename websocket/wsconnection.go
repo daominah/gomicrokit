@@ -218,7 +218,7 @@ func (c *Connection) writePump() {
 	}
 }
 
-func (c *Connection) writeBytes(message []byte, isBinMsg bool) {
+func (c Connection) writeBytes(message []byte, isBinMsg bool) {
 	timeout := time.After(3 * time.Second)
 	select {
 	case c.writeChan <- &wsMessage{data: message, isBinaryMessage: isBinMsg}:
@@ -231,12 +231,12 @@ func (c *Connection) writeBytes(message []byte, isBinMsg bool) {
 }
 
 // send a BinaryMessage to remote
-func (c *Connection) WriteBytes(message []byte) {
+func (c Connection) WriteBytes(message []byte) {
 	c.writeBytes([]byte(message), true)
 }
 
 // send a TextMessage to remote
-func (c *Connection) Write(message string) {
+func (c Connection) Write(message string) {
 	c.writeBytes([]byte(message), false)
 }
 
@@ -247,7 +247,7 @@ func (c *Connection) Close() {
 }
 
 // CheckIsClosed returns true if the connection is disconnected
-func (c *Connection) CheckIsClosed() bool {
+func (c Connection) CheckIsClosed() bool {
 	select {
 	case <-c.ClosedChan:
 		return true
@@ -257,6 +257,6 @@ func (c *Connection) CheckIsClosed() bool {
 }
 
 // return the ConnectionId
-func (c *Connection) GetId() ConnectionId {
+func (c Connection) GetId() ConnectionId {
 	return c.id
 }
