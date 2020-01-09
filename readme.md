@@ -29,6 +29,9 @@ A leveled, rotated by time or file size logger.
 Depend on [go.uber.org/zap](https://github.com/uber-go/zap)
 and [natefinch/lumberjack](https://github.com/natefinch/lumberjack)
 
+##### `textproc`:
+Extracting information from text and html
+
 ##### `socketio`
 It is recommend to use websocket (standardized by IETF) instead.  
 Modified from [graarh/golang-socketio](https://github.com/graarh/golang-socketio)

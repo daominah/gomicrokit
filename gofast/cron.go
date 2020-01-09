@@ -1,3 +1,4 @@
+// Often used functions. Ex: cron job, copy similar struct, gen uuid, ..
 package gofast
 
 import (

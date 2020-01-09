@@ -1,3 +1,4 @@
+// An easy-to-use websocket client and server.
 package websocket
 
 import (

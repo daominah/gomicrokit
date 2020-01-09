@@ -1,3 +1,4 @@
+// An easy-to-use, pure go kafka client.
 package kafka
 
 import (

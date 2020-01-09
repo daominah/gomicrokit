@@ -1,3 +1,5 @@
+// Http server supports http method, url variables and
+// logs all pairs of request/response.
 package httpsvr
 
 import (

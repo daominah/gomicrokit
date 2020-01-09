@@ -1,4 +1,4 @@
-// Package log provvides a leveled, rotated, fast, structured logger.
+// Package log provides a leveled, rotated, fast, structured logger.
 // This package APIs Print and Fatal are compatible the standard library log.
 
 package log
