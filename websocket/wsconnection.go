@@ -21,7 +21,7 @@ var wscfg = wsConfig{
 	WriteWait:         60 * time.Second,
 	PongWait:          60 * time.Second,
 	PingPeriod:        25 * time.Second,
-	LimitMessageBytes: 65536,
+	LimitMessageBytes: 16384,
 }
 
 // package scope config, should be set before create any connection
