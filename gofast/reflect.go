@@ -14,8 +14,9 @@ var (
 	ErrUnexpected       = errors.New("unexpected error feelsbadman")
 )
 
-// copy same fields of 2 struct,
-// destination d must be a pointer, source s can be pointer or value
+// Copy same fields of 2 struct,
+// destination d must be a pointer, source s can be pointer or value.
+// I am sorry, this function kill "Find Usages" and fuck up debugging
 func CopySameFields(d interface{}, s interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
