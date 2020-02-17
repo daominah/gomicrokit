@@ -77,6 +77,7 @@ func TestCheckNilInterface(t *testing.T) {
 		x      interface{}
 		expect bool
 	}{
+		// interface{}(nilStructPtr) == nil will return false
 		{nilStructPtr, true},
 		{myStruct, false},
 		{nilErr, true},

@@ -70,9 +70,10 @@ func checkNilInterface(x interface{}, isDebug bool) (result bool) {
 	return false
 }
 
-// Problem: `x == nil` still returns true if x is a nil struct pointer,
-// checkNilInterface will return false in above case,
-// more examples are in `reflect_test.go`
+// CheckNilInterface returns true if arg x is a nil struct pointer.
+// Why do we need this func: an interface variable is nil only if both the type
+// and value are nil, so expression `x == nil` will return false if x is a nil
+// struct pointer.
 func CheckNilInterface(x interface{}) (result bool) {
 	return checkNilInterface(x, false)
 }
