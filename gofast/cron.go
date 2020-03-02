@@ -1,29 +1,34 @@
-// Often used functions. Ex: cron job, copy similar struct, gen uuid, ..
 package gofast
 
 import (
+	"context"
 	"time"
 )
 
-// Cron should be inited and run by calling NewCron
+// Cron must be initialized and run by calling NewCron
 type Cron struct {
-	job       func()
-	interval  time.Duration
-	remainder time.Duration
-	lastJob   time.Time
-	ticker    *time.Ticker
+	job         func()
+	interval    time.Duration
+	remainder   time.Duration
+	lastJob     time.Time
+	ticker      *time.Ticker
+	stopChan    <-chan struct{}
+	stopChanCxl context.CancelFunc
 }
 
-// Cron periodically executes the job in a goroutine at specific time.
+// NewCron periodically executes input job in a goroutine at specific time.
 // Example: remainder = 7 hours, interval = 24 hours: the job will be executed
 // at 7 a.m. everyday (executed time point accuracy is interval / 100).
 // Any function can be wrap: job = func(){yourFunc(args...)}
 func NewCron(job func(), interval time.Duration, remainder time.Duration) *Cron {
 	// initialize cron obj
+	ctx, cxl := context.WithCancel(context.Background())
 	c := &Cron{
-		job:       job,
-		interval:  interval,
-		remainder: remainder,
+		job:         job,
+		interval:    interval,
+		remainder:   remainder,
+		stopChan:    ctx.Done(),
+		stopChanCxl: cxl,
 	}
 	c.lastJob = time.Now().Add(-c.remainder).Truncate(c.interval).Add(c.remainder)
 
@@ -42,14 +47,19 @@ func NewCron(job func(), interval time.Duration, remainder time.Duration) *Cron 
 					Add(c.remainder)
 			}
 			// sleep for a tick duration
-			<-c.ticker.C
+			select {
+			case <-c.ticker.C:
+				continue
+			case <-c.stopChan:
+				return
+			}
 		}
 	}()
 	return c
 }
 
+// Stop stops the cron's loop
 func (c *Cron) Stop() {
-	if c.ticker != nil {
-		c.ticker.Stop()
-	}
+	c.ticker.Stop()
+	c.stopChanCxl()
 }

@@ -1,4 +1,4 @@
-// An easy-to-use websocket client and server.
+// Package websocket is an easy-to-use websocket client and server.
 package websocket
 
 import (
@@ -13,7 +13,7 @@ import (
 	goraws "github.com/gorilla/websocket"
 )
 
-// whether to log every ws message
+// LOG determines whether to log every ws message
 var LOG = true
 
 // wscfg is this package global config for reading and writing messages
@@ -37,7 +37,8 @@ type wsConfig struct {
 	LimitMessageBytes int64
 }
 
-// change the config of this package for reading and writing messages
+// SetWebsocketConfig changes the config of this package for reading and writing
+// messages
 func SetWebsocketConfig(writeWait time.Duration, pongWait time.Duration,
 	pingPeriod time.Duration, limitMessageBytes int64) {
 	wscfg.WriteWait = writeWait
@@ -65,12 +66,14 @@ func GenConnId(goraConn *goraws.Conn) ConnectionId {
 		localAddr, goraConn.RemoteAddr()))
 }
 
+// OnReadHandler wraps the Handle method
 type OnReadHandler interface {
-	// Handle will be called in a goroutine when conn received a msg from remote.
+	// Handle will be called in a goroutine when conn receives a msg from remote.
 	// :param msgType: int, RFC 6455: TextMessage = 1, BinaryMessage = 2, ..
 	Handle(cid ConnectionId, msgType int, msg []byte)
 }
 
+// ServerHandler wraps all event callbacks of a connection
 type ServerHandler interface {
 	OnReadHandler
 	// OnOpen will be called after a client connected to the server
@@ -231,12 +234,12 @@ func (c Connection) writeBytes(message []byte, isBinMsg bool) {
 	}
 }
 
-// send a BinaryMessage to remote
+// WriteBytes sends a BinaryMessage to remote
 func (c Connection) WriteBytes(message []byte) {
 	c.writeBytes([]byte(message), true)
 }
 
-// send a TextMessage to remote
+// Write sends a TextMessage to remote
 func (c Connection) Write(message string) {
 	c.writeBytes([]byte(message), false)
 }
@@ -257,7 +260,7 @@ func (c Connection) CheckIsClosed() bool {
 	}
 }
 
-// return the ConnectionId
+// GetId returns the ConnectionId
 func (c Connection) GetId() ConnectionId {
 	return c.id
 }

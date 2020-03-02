@@ -1,4 +1,4 @@
-package maths
+package gofast
 
 import (
 	"crypto/rand"
@@ -16,8 +16,8 @@ func GenUUID() string {
 	return r
 }
 
-// This implement does not follow rfc4122 standard,
-// but this follows 8-4-4-4-12 layout
+// GenUUIDWithHyphen does not follow rfc4122 standard,
+// but this func follows 8-4-4-4-12 layout
 func GenUUIDWithHyphen() string {
 	id := GenUUID()
 	if len(id) != 32 { // just to be safe

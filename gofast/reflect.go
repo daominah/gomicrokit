@@ -9,14 +9,14 @@ import (
 )
 
 var (
-	ErrNonPointerOutput = errors.New("non pointer output param")
-	ErrSourceNil        = errors.New("source is nil")
-	ErrUnexpected       = errors.New("unexpected error feelsbadman")
+	errNonPointerOutput = errors.New("non pointer output param")
+	errSourceNil        = errors.New("source is nil")
 )
 
-// Copy same fields of 2 struct,
+// CopySameFields copies same fields of 2 struct,
 // destination d must be a pointer, source s can be pointer or value.
-// I am sorry, this function kill "Find Usages" and fuck up debugging
+// I am sorry, this function kill "Find Usages" and fuck up debugging, though
+// it improve coding speed.
 func CopySameFields(d interface{}, s interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -24,7 +24,7 @@ func CopySameFields(d interface{}, s interface{}) (err error) {
 		}
 	}()
 	if reflect.ValueOf(d).Kind() != reflect.Ptr {
-		return ErrNonPointerOutput
+		return errNonPointerOutput
 	}
 	dType, dValue := reflect.TypeOf(d).Elem(), reflect.ValueOf(d).Elem()
 	sType, sValue := reflect.TypeOf(s), reflect.ValueOf(s)
@@ -32,7 +32,7 @@ func CopySameFields(d interface{}, s interface{}) (err error) {
 		sValue = sValue.Elem()
 	}
 	if !sValue.IsValid() {
-		return ErrSourceNil
+		return errSourceNil
 	}
 	for i := 0; i < dType.NumField(); i++ {
 		dField := dType.FieldByIndex([]int{i})
@@ -71,7 +71,7 @@ func checkNilInterface(x interface{}, isDebug bool) (result bool) {
 }
 
 // CheckNilInterface returns true if arg x is a nil struct pointer.
-// Why do we need this func: an interface variable is nil only if both the type
+// We need this func because an interface variable is nil only if both the type
 // and value are nil, so expression `x == nil` will return false if x is a nil
 // struct pointer.
 func CheckNilInterface(x interface{}) (result bool) {

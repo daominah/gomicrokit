@@ -1,4 +1,4 @@
-// An easy-to-use, pure go kafka client.
+// Package kafka is an easy-to-use, pure go kafka client.
 package kafka
 
 import (
@@ -13,15 +13,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// LOG determines whether to log when sending or receiving a message.
 var LOG = true
 
+// Offset configs the consumer
 type Offset int64
 
+// Special offset
 const (
 	OffsetEarliest = Offset(sarama.OffsetOldest)
 	OffsetLatest   = Offset(sarama.OffsetNewest)
 )
 
+// Errors when consume
 var (
 	ErrReadMsgTimeout     = errors.New("read message timeout")
 	ErrReadClosedConsumer = errors.New("read message on closed consumer")
@@ -38,7 +42,7 @@ type ConsumerConfig struct {
 	Offset  Offset
 }
 
-// represent consumed message from kafka
+// Message represents a message consumed from kafka
 type Message struct {
 	Value     string
 	Offset    int64
@@ -48,9 +52,10 @@ type Message struct {
 	Timestamp time.Time
 }
 
+// Consumer _
 type Consumer struct {
 	client  sarama.ConsumerGroup
-	handler *ConsumerGroupHandlerImpl
+	handler *consumerGroupHandlerImpl
 	// call this func to stop the connecting loop in the constructor
 	cancelFunc context.CancelFunc
 	closed     bool
@@ -59,6 +64,8 @@ type Consumer struct {
 	isTryingReconnect bool
 }
 
+// NewConsumer returns an auto reconnect Consumer.
+// This func returns error if cannot connect
 func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	log.Infof("creating a consumer with %#v", conf)
 	// construct sarama config
@@ -79,7 +86,7 @@ func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	}
 	log.Infof("connected to kafka cluster %v", conf.BootstrapServers)
 
-	c.handler = &ConsumerGroupHandlerImpl{
+	c.handler = &consumerGroupHandlerImpl{
 		consumer:  c,
 		readyChan: make(chan bool),
 	}
@@ -118,30 +125,85 @@ func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	return c, nil
 }
 
-type ReadMsgRequest struct {
+// ReadMessage reads one message if available or waits maximum timeout duration.
+// Set timeout = -1 to wait forever
+func (c Consumer) ReadMessage(timeout time.Duration) (*Message, error) {
+	if c.closed {
+		return nil, ErrReadClosedConsumer
+	}
+	if timeout < 0 {
+		timeout = 24 * time.Hour
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	request := &readMsgRequest{ctx: ctx, responseChan: make(chan *Message)}
+
+	// send the request to all partitions reader
+	readMsgChans := make([]chan *readMsgRequest, 0)
+	c.handler.mutex.RLock()
+	for _, v := range c.handler.readMsgChans {
+		readMsgChans = append(readMsgChans, v)
+	}
+	c.handler.mutex.RUnlock()
+	for _, partitionChan := range readMsgChans {
+		go func(partitionChan chan *readMsgRequest) {
+			select {
+			case partitionChan <- request:
+			case <-ctx.Done():
+				// this branch will execute when client disconnected to kafka so
+				// ConsumeClaim is not running or timeout duration is too short
+			}
+		}(partitionChan)
+	}
+
+	// only receive the first reply from partition readers,
+	// only this partition reader can commit offset
+	select {
+	case msg := <-request.responseChan:
+		return msg, nil
+	case <-ctx.Done():
+		return nil, ErrReadMsgTimeout
+	}
+}
+
+// Close is an unused function :v
+func (c *Consumer) Close() {
+	c.closed = true
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+	}
+	if c.client != nil {
+		log.Debugf("consumer_Close cp1")
+		err := c.client.Close()
+		log.Infof("error when close client: %v", err)
+	}
+	log.Debugf("consumer_Close cp2")
+}
+
+type readMsgRequest struct {
 	ctx          context.Context
 	responseChan chan *Message
 }
 
-type ConsumerGroupHandlerImpl struct {
+type consumerGroupHandlerImpl struct {
 	consumer *Consumer
 	// close this channel to notify client joined consumer group successfully
 	readyChan chan bool
 	// each entry in this map correspond to a assigned partition,
 	// consumer_ReadMessage send to all these channels, receive the first result
-	readMsgChans map[string](chan *ReadMsgRequest)
+	readMsgChans map[string](chan *readMsgRequest)
 	mutex        sync.RWMutex
 }
 
-func (h *ConsumerGroupHandlerImpl) Setup(s sarama.ConsumerGroupSession) error {
+func (h *consumerGroupHandlerImpl) Setup(s sarama.ConsumerGroupSession) error {
 	log.Infof("joined consumer group, assigned partitions %#v", s.Claims())
 	h.consumer.isTryingReconnect = false
 	h.mutex.Lock()
-	h.readMsgChans = make(map[string](chan *ReadMsgRequest))
+	h.readMsgChans = make(map[string](chan *readMsgRequest))
 	for topic, parts := range s.Claims() {
 		for _, part := range parts {
 			h.readMsgChans[fmt.Sprintf("%v:%v", topic, part)] =
-				make(chan *ReadMsgRequest)
+				make(chan *readMsgRequest)
 		}
 	}
 	h.mutex.Unlock()
@@ -149,12 +211,12 @@ func (h *ConsumerGroupHandlerImpl) Setup(s sarama.ConsumerGroupSession) error {
 	return nil
 }
 
-func (h *ConsumerGroupHandlerImpl) Cleanup(sarama.ConsumerGroupSession) error {
+func (h *consumerGroupHandlerImpl) Cleanup(sarama.ConsumerGroupSession) error {
 	return nil
 }
 
 // each assigned partition will run this func in a goroutine
-func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
+func (h *consumerGroupHandlerImpl) ConsumeClaim(
 	session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	partition := fmt.Sprintf("%v:%v", claim.Topic(), claim.Partition())
 	defer log.Infof("func ConsumeClaim for %v returned", partition)
@@ -177,7 +239,7 @@ func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
 				msg := &Message{Value: string(samMsg.Value), Offset: samMsg.Offset,
 					Topic: samMsg.Topic, Partition: samMsg.Partition,
 					Key: string(samMsg.Key), Timestamp: samMsg.Timestamp}
-				log.Condf(LOG,"received a message from topic %v:%v:%v: %v",
+				log.Condf(LOG, "received a message from topic %v:%v:%v: %v",
 					msg.Topic, msg.Partition, msg.Offset, msg.Value)
 				select {
 				case readRequest.responseChan <- msg:
@@ -194,59 +256,4 @@ func (h *ConsumerGroupHandlerImpl) ConsumeClaim(
 		}
 	}
 	return nil
-}
-
-// timeout: maximum time to block waiting for message,
-//     set timeout = -1 to wait forever
-func (c Consumer) ReadMessage(timeout time.Duration) (*Message, error) {
-	if c.closed {
-		return nil, ErrReadClosedConsumer
-	}
-	if timeout < 0 {
-		timeout = 24 * time.Hour
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	request := &ReadMsgRequest{ctx: ctx, responseChan: make(chan *Message)}
-
-	// send the request to all partitions reader
-	readMsgChans := make([]chan *ReadMsgRequest, 0)
-	c.handler.mutex.RLock()
-	for _, v := range c.handler.readMsgChans {
-		readMsgChans = append(readMsgChans, v)
-	}
-	c.handler.mutex.RUnlock()
-	for _, partitionChan := range readMsgChans {
-		go func(partitionChan chan *ReadMsgRequest) {
-			select {
-			case partitionChan <- request:
-			case <-ctx.Done():
-				// this branch will execute when client disconnected to kafka so
-				// ConsumeClaim is not running or timeout duration is too short
-			}
-		}(partitionChan)
-	}
-
-	// only receive the first reply from partition readers,
-	// only this partition reader can commit offset
-	select {
-	case msg := <-request.responseChan:
-		return msg, nil
-	case <-ctx.Done():
-		return nil, ErrReadMsgTimeout
-	}
-}
-
-// unused function
-func (c *Consumer) Close() {
-	c.closed = true
-	if c.cancelFunc != nil {
-		c.cancelFunc()
-	}
-	if c.client != nil {
-		log.Debugf("consumer_Close cp1")
-		err := c.client.Close()
-		log.Infof("error when close client: %v", err)
-	}
-	log.Debugf("consumer_Close cp2")
 }

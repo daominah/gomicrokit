@@ -1,5 +1,5 @@
-// Http server supports http method, url variables and
-// logs all pairs of request/response.
+// Package httpsvr supports http method, url variables and
+// logs all pairs of request/response. API is similar to standard net/http
 package httpsvr
 
 import (
@@ -10,25 +10,26 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/daominah/gomicrokit/gofast"
 	"github.com/daominah/gomicrokit/log"
-	"github.com/daominah/gomicrokit/maths"
 	"github.com/julienschmidt/httprouter"
 )
 
-// whether to log all pairs of request/response
+// LOG determines whether to log all pairs of request/response
 var LOG = true
 
-// Server should be constructed by calling func NewServer, then be embedded.
-// Example usage in `_examples/httpsvr/httpsvr.go`
+// Server must be inited by calling func NewServer.
+// Example usage in `a_examples/httpsvr/httpsvr.go`
 type Server struct {
 	router *httprouter.Router
 	// TODO: add instrument metric for handlers
 }
 
+// NewServer returns a inited Server
 func NewServer() *Server { return &Server{router: httprouter.New()} }
 
+// AddHandler must be called before ListenAndServe
 // ex: AddHandler("GET", "/", ExampleHandler())
-// all AddHandlers must call before ListenAndServe
 func (s *Server) AddHandler(method string, path string, handler http.HandlerFunc) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -52,8 +53,6 @@ type httpLogger struct {
 	handler http.Handler
 }
 
-const ctxRequestId = "ctxRequestId"
-
 // log on every received request
 func (l httpLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// http request's body can only be read once,
@@ -66,7 +65,7 @@ func (l httpLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		query = "?" + query
 	}
 
-	requestId := maths.GenUUID()[:8]
+	requestId := gofast.GenUUID()[:8]
 	log.Condf(LOG, "request %v from %v: %v %v%v %v",
 		requestId, r.RemoteAddr, r.Method, r.URL.Path, query, string(reqBodyBytes))
 
@@ -74,8 +73,11 @@ func (l httpLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// Write includes logging,
-// input r is the corresponding request of the response
+type ctxKey string
+
+const ctxRequestId ctxKey = "ctxRequestId"
+
+// Write includes logging, input r is the corresponding request of the response
 func Write(w http.ResponseWriter, r *http.Request, bodyB []byte) {
 	_, err := w.Write(bodyB)
 	bodyS := string(bodyB)
@@ -88,8 +90,7 @@ func Write(w http.ResponseWriter, r *http.Request, bodyB []byte) {
 	log.Condf(LOG, "respond %v successfully: %v", requestId, bodyS)
 }
 
-// WriteJson includes logging,
-// input r is the corresponding request of the response
+// WriteJson includes logging, input r is the corresponding request of the response
 func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) {
 	bodyB, err := json.Marshal(obj)
 	if err != nil {
@@ -100,6 +101,8 @@ func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) {
 	Write(w, r, bodyB)
 }
 
+// WriteErr responds with the HTTP code and the err message in body.
+// WriteErr includes logging, input r is the corresponding request of the response
 func WriteErr(w http.ResponseWriter, r *http.Request, code int, err string) {
 	requestId := r.Context().Value(ctxRequestId)
 	log.Condf(LOG, "respond %v: code: %v, error: %v", requestId, code, err)
@@ -116,7 +119,7 @@ func ReadJson(r *http.Request, outPtr interface{}) error {
 	return err
 }
 
-// return URL parameters from a http request as a map
+// GetUrlParams returns URL parameters from a http request as a map,
 // ex: path `/match/:id` has param `id`
 func GetUrlParams(r *http.Request) map[string]string {
 	params := httprouter.ParamsFromContext(r.Context())
@@ -130,6 +133,7 @@ func GetUrlParams(r *http.Request) map[string]string {
 	return result
 }
 
+// ExampleHandler _
 func ExampleHandler() http.HandlerFunc {
 	// thing := initHandler() // one-time per-handler initialisation
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -140,6 +144,7 @@ func ExampleHandler() http.HandlerFunc {
 	}
 }
 
+// ExampleHandlerError _
 func ExampleHandlerError() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// not marshallable data

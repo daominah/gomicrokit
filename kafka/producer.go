@@ -6,26 +6,31 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/daominah/gomicrokit/gofast"
 	"github.com/daominah/gomicrokit/log"
-	"github.com/daominah/gomicrokit/maths"
 	"github.com/pkg/errors"
 )
 
+// Errors when produce
 var (
-	ErWriteTimeout = errors.New("write message timeout")
+	ErrWriteTimeout = errors.New("write message timeout")
 )
 
+// ProducerConfig _
 type ProducerConfig struct {
-	// comma separated list: broker1:9092,broker2:9092,broker3:9092
-	BrokersList  string
+	// BrokersList is a comma separated list: "broker1:9092,broker2:9092,broker3:9092"
+	BrokersList string
+	// DefaultTopic should not be empty
 	DefaultTopic string
 }
 
+// Producer _
 type Producer struct {
 	defaultTopic string
 	samProducer  sarama.AsyncProducer
 }
 
+// NewProducer returns a connected Producer
 func NewProducer(conf ProducerConfig) (*Producer, error) {
 	log.Infof("creating a producer with %#v", conf)
 	// construct sarama config
@@ -55,16 +60,16 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	}()
 	go func() {
 		for sent := range p.samProducer.Successes() {
-			log.Condf(LOG,"delivered msgId %v to topic %v:%v:%v",
+			log.Condf(LOG, "delivered msgId %v to topic %v:%v:%v",
 				sent.Metadata, sent.Topic, sent.Partition, sent.Offset)
 		}
 	}()
 	return p, nil
 }
 
-// messages have a same key will be sent to same partition.
+// SendExplicitMessage sends messages have a same key to same partition
 func (p Producer) SendExplicitMessage(topic string, value string, key string) error {
-	uniqueId := maths.GenUUID()[:8]
+	uniqueId := gofast.GenUUID()[:8]
 	samMsg := &sarama.ProducerMessage{
 		Value:    sarama.StringEncoder(value),
 		Topic:    topic,
@@ -76,15 +81,16 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 	var err error
 	select {
 	case p.samProducer.Input() <- samMsg:
-		log.Condf(LOG,"sending msgId %v to %v:%v: %v",
+		log.Condf(LOG, "sending msgId %v to %v:%v: %v",
 			uniqueId, samMsg.Topic, key, samMsg.Value)
 		err = nil
 	case <-time.After(1 * time.Second):
-		err = ErWriteTimeout
+		err = ErrWriteTimeout
 	}
 	return err
 }
 
+// SendMessage sends message to a random partition of defaultTopic
 func (p Producer) SendMessage(value string) error {
 	return p.SendExplicitMessage(p.defaultTopic, value, "")
 }

@@ -25,4 +25,5 @@ func TestCron(t *testing.T) {
 	if len(counter) != 20 {
 		t.Error(len(counter))
 	}
+	c.Stop()
 }

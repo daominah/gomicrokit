@@ -6,7 +6,7 @@ import (
 	"github.com/daominah/gomicrokit/log"
 )
 
-// return location +07:00
+// VietnamTimeLoc returns location +07:00
 func VietnamTimeLoc() *time.Location {
 	loc, err := time.LoadLocation("Asia/Ho_Chi_Minh")
 	if err != nil {
@@ -15,12 +15,12 @@ func VietnamTimeLoc() *time.Location {
 	return loc
 }
 
-// return now in location +07:00
+// VietnamTimeNow returns now in location +07:00
 func VietnamTimeNow() time.Time {
 	return time.Now().In(VietnamTimeLoc())
 }
 
-// return ex: 2006-01-02T15:04:05+07:00
+// VietnamTimeNowIso returns now in format 2006-01-02T15:04:05+07:00
 func VietnamTimeNowIso() string {
 	return VietnamTimeNow().Format(time.RFC3339)
 }

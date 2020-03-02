@@ -90,15 +90,14 @@ zpDIXA0lk8M3sCah9pbdl5EVSSNRjjGBHLIiAMxyxhpMiyCXpqGHSU0CAwEAAQ==
 	}
 	authInfo := AuthInfo{UserId: 119, UserName: "Đào Thị Lán"}
 	token := jwter.CreateAuthToken(authInfo)
-	//fmt.Println("token:", token)
 	if len(token) == 0 {
 		t.Error()
 	}
 
 	var auth0 AuthInfo
 	err = jwter.CheckAuthToken(token, auth0)
-	if err != ErrNonPointerOutput {
-		t.Error()
+	if err != errNonPointerOutput {
+		t.Error(err)
 	}
 
 	err = jwter.CheckAuthToken(token, &auth0)
@@ -110,15 +109,21 @@ zpDIXA0lk8M3sCah9pbdl5EVSSNRjjGBHLIiAMxyxhpMiyCXpqGHSU0CAwEAAQ==
 		t.Errorf("error: %#v, %#v", auth0, authInfo)
 	}
 
-	type WrongAuthInfo struct {
+	type WrongAuthInfoDataType struct {
 		UserId   int64
 		UserName int64
 	}
-	var wauth WrongAuthInfo
-	err = jwter.CheckAuthToken(token, &wauth)
-	//fmt.Println("wauth, err:", wauth, err)
-	if err == nil {
+	var wAuth WrongAuthInfoDataType
+	err = jwter.CheckAuthToken(token, &wAuth)
+	if err == nil { // cannot UserName string into int64
 		t.Error()
+	}
+
+	jwter.tokenExpireDuration = 0
+	token2 := jwter.CreateAuthToken(authInfo)
+	err = jwter.CheckAuthToken(token2, &auth0)
+	if err != errExpiredToken {
+		t.Error(err)
 	}
 }
 

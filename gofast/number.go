@@ -1,4 +1,4 @@
-package maths
+package gofast
 
 const (
 	maxUint = ^uint(0)
@@ -6,6 +6,7 @@ const (
 	minInt  = -maxInt - 1
 )
 
+// MinInts find the min value in the inputs
 func MinInts(ints ...int) int {
 	r := maxInt
 	for _, i := range ints {
@@ -16,6 +17,7 @@ func MinInts(ints ...int) int {
 	return r
 }
 
+// MaxInts find the max value in the inputs
 func MaxInts(ints ...int) int {
 	r := minInt
 	for _, i := range ints {

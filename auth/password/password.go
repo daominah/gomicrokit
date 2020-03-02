@@ -1,3 +1,4 @@
+// Package password provides password related funcs
 package password
 
 import (
@@ -5,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daominah/gomicrokit/maths"
+	"github.com/daominah/gomicrokit/gofast"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -26,6 +27,8 @@ func init() {
 	}
 }
 
+// GenRandomPassword returns a mixture of uppercase, lowercase, number and
+// special characters.
 func GenRandomPassword(lenPasswd int) string {
 	if lenPasswd < 4 {
 		lenPasswd = 4
@@ -37,14 +40,16 @@ func GenRandomPassword(lenPasswd int) string {
 		forceIndex := forceIndices[i]
 		password[forceIndex] = charType[rand.Intn(len(charType))]
 	}
-	for i, _ := range password {
-		if maths.IndexInts(forceIndices, i) == -1 {
+	for i := range password {
+		if gofast.IndexInts(forceIndices, i) == -1 {
 			password[i] = allChars[rand.Intn(len(allChars))]
 		}
 	}
 	return strings.Join(password, "")
 }
 
+// HashPassword is a slow hash func with salt automatically included (
+// results in different call can be varied).
 func HashPassword(plain string) string {
 	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.MinCost)
 	if err != nil {
@@ -53,6 +58,7 @@ func HashPassword(plain string) string {
 	return string(hash)
 }
 
+// CheckHashPassword checks if the hashed was hashed from the plain
 func CheckHashPassword(hashed string, plain string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashed), []byte(plain))
 	if err != nil {

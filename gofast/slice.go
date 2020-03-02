@@ -1,4 +1,4 @@
-package maths
+package gofast
 
 // IndexInts returns the index of the first instance of sub in slice,
 // or -1 if sub is not present in slice

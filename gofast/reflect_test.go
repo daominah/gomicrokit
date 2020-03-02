@@ -26,11 +26,11 @@ func TestCopySameFields(t *testing.T) {
 	s := S{F1: 1, F2: "f2", F3: true, F5: "f5"}
 	var d1 D1
 	err := CopySameFields(d1, s)
-	if err != ErrNonPointerOutput {
+	if err != errNonPointerOutput {
 		t.Error(err)
 	}
 	err = CopySameFields(&d1, nil)
-	if err != ErrSourceNil {
+	if err != errSourceNil {
 		t.Error(err)
 	}
 

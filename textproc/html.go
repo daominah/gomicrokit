@@ -1,4 +1,3 @@
-// Extracting information from text and html
 package textproc
 
 import (

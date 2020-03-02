@@ -1,6 +1,5 @@
 // Package log provides a leveled, rotated, fast, structured logger.
 // This package APIs Print and Fatal are compatible the standard library log.
-
 package log
 
 import (
@@ -15,8 +14,11 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// GlobalLogger will be inited with config from env vars.
+// All funcs in this package use GlobalLogger
 var GlobalLogger *zap.SugaredLogger = NewLogger(NewConfigFromEnv())
 
+// Config _
 type Config struct {
 	// default log level is debug
 	IsLogLevelInfo bool
@@ -30,6 +32,7 @@ type Config struct {
 	RotateInterval time.Duration
 }
 
+// NewConfigFromEnv reads env vars to return a Config
 func NewConfigFromEnv() Config {
 	var c Config
 	c.IsLogLevelInfo, _ = strconv.ParseBool(os.Getenv("LOG_LEVEL_INFO"))
@@ -40,6 +43,7 @@ func NewConfigFromEnv() Config {
 	return c
 }
 
+// NewLogger returns a inited Logger
 func NewLogger(conf Config) *zap.SugaredLogger {
 	encoderConf := zap.NewProductionEncoderConfig()
 	encoderConf.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -54,7 +58,7 @@ func NewLogger(conf Config) *zap.SugaredLogger {
 		if conf.IsNotLogRotate {
 			fileWriter, _, _ = zap.Open(conf.LogFilePath)
 		} else {
-			fileWriter = zapcore.AddSync(NewTimedRotatingWriter(
+			fileWriter = zapcore.AddSync(newTimedRotatingWriter(
 				&lumberjack.Logger{Filename: conf.LogFilePath},
 				conf.RotateInterval,
 			))
@@ -78,15 +82,15 @@ func NewLogger(conf Config) *zap.SugaredLogger {
 	return logger
 }
 
-type TimedRotatingWriter struct {
+type timedRotatingWriter struct {
 	*lumberjack.Logger
 	interval    time.Duration
 	mutex       sync.RWMutex
 	lastRotated time.Time
 }
 
-func NewTimedRotatingWriter(base *lumberjack.Logger, interval time.Duration) *TimedRotatingWriter {
-	w := &TimedRotatingWriter{Logger: base, interval: interval}
+func newTimedRotatingWriter(base *lumberjack.Logger, interval time.Duration) *timedRotatingWriter {
+	w := &timedRotatingWriter{Logger: base, interval: interval}
 	w.mutex.Lock()
 	w.Logger.Rotate()
 	w.lastRotated = time.Now().Truncate(interval)
@@ -94,7 +98,7 @@ func NewTimedRotatingWriter(base *lumberjack.Logger, interval time.Duration) *Ti
 	return w
 }
 
-func (w *TimedRotatingWriter) rotateIfNeeded() error {
+func (w *timedRotatingWriter) rotateIfNeeded() error {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	if time.Now().Sub(w.lastRotated) < w.interval {
@@ -106,7 +110,7 @@ func (w *TimedRotatingWriter) rotateIfNeeded() error {
 	return err
 }
 
-func (w *TimedRotatingWriter) Write(p []byte) (int, error) {
+func (w *timedRotatingWriter) Write(p []byte) (int, error) {
 	err := w.rotateIfNeeded()
 	if err != nil {
 		return 0, err

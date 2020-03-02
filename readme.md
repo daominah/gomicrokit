@@ -4,14 +4,15 @@ Often used package for microservices
 
 ### Packages
 
-##### `_examples`
-Executables as example usage of packages.
+##### `a_examples`
+Directory a_examples contains executables as example usage of 
+other packages in this project
 
 ##### `auth`
 Packages: genrsa, jwt, password  
 Depend on [dgrijalva/jwt-go](https://github.com/dgrijalva/jwt-go)
 
-##### `gofast`, `maths`
+##### `gofast`
 Often used functions. Ex: cron job, copy similar struct,
 gen uuid, ..
 

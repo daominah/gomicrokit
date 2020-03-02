@@ -9,6 +9,7 @@ import (
 	goraws "github.com/gorilla/websocket"
 )
 
+// Server must be inited by NewServer
 type Server struct {
 	listeningPort string
 	wsPath        string
@@ -18,6 +19,7 @@ type Server struct {
 	Mutex         sync.Mutex
 }
 
+// NewServer returns a Server with inited map connections and router
 func NewServer(listeningPort string, wsPath string) *Server {
 	s := &Server{
 		listeningPort: listeningPort,
@@ -61,6 +63,7 @@ func (s *Server) handleUpgradeWs() http.HandlerFunc {
 	}
 }
 
+// ListenAndServe listens on the server's listeningPort
 func (s *Server) ListenAndServe() error {
 	log.Infof(`starting websocket server on "ws://host%v%v`,
 		s.listeningPort, s.wsPath)
@@ -76,6 +79,7 @@ func (s *Server) Write(connId ConnectionId, message string) {
 	}
 }
 
+// WriteBytes sends a BinaryMessage to the given connection
 func (s *Server) WriteBytes(connId ConnectionId, message []byte) {
 	s.Mutex.Lock()
 	conn := s.Connections[connId]
@@ -85,21 +89,25 @@ func (s *Server) WriteBytes(connId ConnectionId, message []byte) {
 	}
 }
 
+// WriteAll sends a TextMessage to all connections
 func (s *Server) WriteAll(message string) {
 	s.Mutex.Lock()
 	for _, conn := range s.Connections {
-		if conn != nil {
-			go conn.Write(message)
+		cloned := conn
+		if cloned != nil {
+			go cloned.Write(message)
 		}
 	}
 	s.Mutex.Unlock()
 }
 
+// WriteBytesAll sends a BinaryMessage to all connections
 func (s *Server) WriteBytesAll(message []byte) {
 	s.Mutex.Lock()
 	for _, conn := range s.Connections {
-		if conn != nil {
-			go conn.WriteBytes(message)
+		cloned := conn
+		if cloned != nil {
+			go cloned.WriteBytes(message)
 		}
 	}
 	s.Mutex.Unlock()
