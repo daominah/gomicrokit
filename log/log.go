@@ -205,3 +205,18 @@ func (l *StdLogger) Fatalln(v ...interface{}) {
 func (l *StdLogger) Fatalf(format string, v ...interface{}) {
 	GlobalLogger.Fatalf(format, v...)
 }
+
+func (l *StdLogger) Panic(v ...interface{}) {
+	GlobalLogger.Info(v...)
+	panic(920911)
+}
+
+func (l *StdLogger) Panicf(format string, v ...interface{}) {
+	GlobalLogger.Infof(format, v...)
+	panic(920911)
+}
+
+func (l *StdLogger) Panicln(v ...interface{}) {
+	GlobalLogger.Info(v...)
+	panic(920911)
+}
