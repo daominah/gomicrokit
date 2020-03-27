@@ -1,7 +1,6 @@
 package gofast
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -16,7 +15,6 @@ func VietnamTimeLoc() *time.Location {
 	}
 	t0, err := time.Parse(time.RFC3339, "2020-03-27T11:00:31+07:00")
 	if err == nil {
-		fmt.Printf("%#v", t0.Location())
 		return t0.Location()
 	}
 	return time.Local
