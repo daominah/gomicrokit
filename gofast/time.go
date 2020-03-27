@@ -1,18 +1,25 @@
 package gofast
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/daominah/gomicrokit/log"
+	"github.com/pkg/errors"
 )
 
 // VietnamTimeLoc returns location +07:00
 func VietnamTimeLoc() *time.Location {
 	loc, err := time.LoadLocation("Asia/Ho_Chi_Minh")
-	if err != nil {
-		log.Infof("cannot load vietnam time location vietnam", err)
+	err = errors.New("haha")
+	if err == nil {
+		return loc
 	}
-	return loc
+	t0, err := time.Parse(time.RFC3339, "2020-03-27T11:00:31+07:00")
+	if err == nil {
+		fmt.Printf("%#v", t0.Location())
+		return t0.Location()
+	}
+	return time.Local
 }
 
 // VietnamTimeNow returns now in location +07:00
