@@ -2,14 +2,11 @@ package gofast
 
 import (
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // VietnamTimeLoc returns location +07:00
 func VietnamTimeLoc() *time.Location {
 	loc, err := time.LoadLocation("Asia/Ho_Chi_Minh")
-	err = errors.New("haha")
 	if err == nil {
 		return loc
 	}
