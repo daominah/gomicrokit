@@ -9,27 +9,98 @@ import (
 	goraws "github.com/gorilla/websocket"
 )
 
-// Server must be inited by NewServer
-type Server struct {
-	listeningPort string
-	wsPath        string
-	HttpRouter    *httpsvr.Server
-	Handler       ServerHandler
-	Connections   map[ConnectionId]*Connection
-	Mutex         sync.Mutex
+// ServerHandler defines events a websocket server must support
+type ServerHandler interface {
+	OnMessageHandler
+	// OnOpen will be called after a client connected
+	OnOpen(cid ConnectionId, initHttpReq *http.Request)
+	// OnClose will be called after a connection disconnected,
+	// OnClose acts as both onerror and onclose in W3C standards
+	OnClose(cid ConnectionId)
 }
 
-// NewServer returns a Server with inited map connections and router
-func NewServer(listeningPort string, wsPath string) *Server {
+// Server must be initialized by calling NewServer
+type Server struct {
+	// Handler implements OnOpen, OnMessage, OnClose functions,
+	// the Handler must be assigned before call this_ListenAndServe
+	Handler ServerHandler
+	// in case you want to use the port as a http server too
+	HttpRouter    *httpsvr.Server
+	wsConfig      Config
+	listeningPort string // begin with char ":"
+	wsPath        string // begin with char "/"
+	connections   map[ConnectionId]*Connection
+	mutex         *sync.Mutex
+}
+
+// NewServer initializes a Server,
+// :param wsConfig: can be nil
+func NewServer(listeningPort string, wsPath string, wsConfig *Config) *Server {
+	if wsConfig == nil {
+		wsConfig = &DefaultConfig
+	}
 	s := &Server{
+		Handler:       &Ignorer{},
+		HttpRouter:    httpsvr.NewServer(),
+		wsConfig:      *wsConfig,
 		listeningPort: listeningPort,
 		wsPath:        wsPath,
-		HttpRouter:    httpsvr.NewServer(),
-		Connections:   make(map[ConnectionId]*Connection),
-		Handler:       &EmptyHandler{},
+		connections:   make(map[ConnectionId]*Connection),
+		mutex:         &sync.Mutex{},
 	}
 	s.HttpRouter.AddHandler("GET", wsPath, s.handleUpgradeWs())
 	return s
+}
+
+// ListenAndServe listens on the listeningPort
+func (s Server) ListenAndServe() error {
+	log.Infof(`starting websocket server on "ws://host%v%v`,
+		s.listeningPort, s.wsPath)
+	return s.HttpRouter.ListenAndServe(s.listeningPort)
+}
+
+// WriteAll sends a TextMessage to all clients
+func (s Server) WriteAll(message string) {
+	s.mutex.Lock()
+	for _, conn := range s.connections {
+		cloned := conn
+		if cloned != nil {
+			go cloned.Write(message)
+		}
+	}
+	s.mutex.Unlock()
+}
+
+// WriteBytesAll sends a BinaryMessage to all clients
+func (s Server) WriteBytesAll(message []byte) {
+	s.mutex.Lock()
+	for _, conn := range s.connections {
+		cloned := conn
+		if cloned != nil {
+			go cloned.WriteBytes(message)
+		}
+	}
+	s.mutex.Unlock()
+}
+
+// Write sends a TextMessage to the given connection
+func (s Server) Write(connId ConnectionId, message string) {
+	s.mutex.Lock()
+	conn := s.connections[connId]
+	s.mutex.Unlock()
+	if conn != nil {
+		conn.Write(message)
+	}
+}
+
+// WriteBytes sends a BinaryMessage to the given connection
+func (s Server) WriteBytes(connId ConnectionId, message []byte) {
+	s.mutex.Lock()
+	conn := s.connections[connId]
+	s.mutex.Unlock()
+	if conn != nil {
+		conn.WriteBytes(message)
+	}
 }
 
 func (s *Server) handleUpgradeWs() http.HandlerFunc {
@@ -41,82 +112,39 @@ func (s *Server) handleUpgradeWs() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		goraConn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Infof("error when upgrader_Upgrade for %v: %v",
-				r.RemoteAddr, err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Infof("cannot Upgrade for %v: %v", r.RemoteAddr, err)
 			return
 		}
-		s.Mutex.Lock()
-		conn := NewConnection(goraConn, s.Handler)
-		s.Connections[conn.id] = conn
-		s.Mutex.Unlock()
-		log.Condf(LOG, "%v connected", conn.id)
-		go s.Handler.OnOpen(conn.id, r)
+		conn := wrapConn(goraConn, s.Handler)
+		conn.Config = s.wsConfig
+		s.mutex.Lock()
+		s.connections[conn.Id] = conn
+		s.mutex.Unlock()
+		go s.Handler.OnOpen(conn.Id, r)
+		log.Condf(LOG, "nWSConnections: %v", s.GetNumberConnections())
 		go func() {
-			<-conn.ClosedChan
-			s.Mutex.Lock()
-			delete(s.Connections, conn.id)
-			s.Mutex.Unlock()
-			log.Condf(LOG, "%v disconnected", conn.id)
-			go s.Handler.OnClose(conn.id)
+			<-conn.ClosedCtxDone
+			s.mutex.Lock()
+			delete(s.connections, conn.Id)
+			s.mutex.Unlock()
+			go s.Handler.OnClose(conn.Id)
+			log.Condf(LOG, "nWSConnections: %v", s.GetNumberConnections())
 		}()
 	}
 }
 
-// ListenAndServe listens on the server's listeningPort
-func (s *Server) ListenAndServe() error {
-	log.Infof(`starting websocket server on "ws://host%v%v`,
-		s.listeningPort, s.wsPath)
-	return s.HttpRouter.ListenAndServe(s.listeningPort)
-}
-
-func (s *Server) Write(connId ConnectionId, message string) {
-	s.Mutex.Lock()
-	conn := s.Connections[connId]
-	s.Mutex.Unlock()
-	if conn != nil {
-		conn.Write(message)
-	}
-}
-
-// WriteBytes sends a BinaryMessage to the given connection
-func (s *Server) WriteBytes(connId ConnectionId, message []byte) {
-	s.Mutex.Lock()
-	conn := s.Connections[connId]
-	s.Mutex.Unlock()
-	if conn != nil {
-		conn.WriteBytes(message)
-	}
-}
-
-// WriteAll sends a TextMessage to all connections
-func (s *Server) WriteAll(message string) {
-	s.Mutex.Lock()
-	for _, conn := range s.Connections {
-		cloned := conn
-		if cloned != nil {
-			go cloned.Write(message)
-		}
-	}
-	s.Mutex.Unlock()
-}
-
-// WriteBytesAll sends a BinaryMessage to all connections
-func (s *Server) WriteBytesAll(message []byte) {
-	s.Mutex.Lock()
-	for _, conn := range s.Connections {
-		cloned := conn
-		if cloned != nil {
-			go cloned.WriteBytes(message)
-		}
-	}
-	s.Mutex.Unlock()
-}
-
 // GetConnection can return nil
-func (s *Server) GetConnection(connId ConnectionId) *Connection {
-	s.Mutex.Lock()
-	conn := s.Connections[connId]
-	s.Mutex.Unlock()
+func (s Server) GetConnection(connId ConnectionId) *Connection {
+	s.mutex.Lock()
+	conn := s.connections[connId]
+	s.mutex.Unlock()
 	return conn
+}
+
+// GetNumberConnections returns number of connecting clients
+func (s Server) GetNumberConnections() int {
+	s.mutex.Lock()
+	ret := len(s.connections)
+	s.mutex.Unlock()
+	return ret
 }

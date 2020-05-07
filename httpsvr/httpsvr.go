@@ -69,13 +69,14 @@ func (l httpLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Condf(LOG, "request %v from %v: %v %v%v %v",
 		requestId, r.RemoteAddr, r.Method, r.URL.Path, query, string(reqBodyBytes))
 
-	ctx := context.WithValue(r.Context(), ctxRequestId, requestId)
+	ctx := context.WithValue(r.Context(), CtxRequestId, requestId)
 	l.handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
 type ctxKey string
 
-const ctxRequestId ctxKey = "ctxRequestId"
+// CtxRequestId is a internal request id
+const CtxRequestId ctxKey = "CtxRequestId"
 
 // Write includes logging, input r is the corresponding request of the response
 func Write(w http.ResponseWriter, r *http.Request, bodyB []byte) {
@@ -86,7 +87,7 @@ func Write(w http.ResponseWriter, r *http.Request, bodyB []byte) {
 		WriteErr(w, r, http.StatusInternalServerError, errMsg)
 		return
 	}
-	requestId := r.Context().Value(ctxRequestId)
+	requestId := r.Context().Value(CtxRequestId)
 	log.Condf(LOG, "respond %v successfully: %v", requestId, bodyS)
 }
 
@@ -104,7 +105,7 @@ func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) {
 // WriteErr responds with the HTTP code and the err message in body.
 // WriteErr includes logging, input r is the corresponding request of the response
 func WriteErr(w http.ResponseWriter, r *http.Request, code int, err string) {
-	requestId := r.Context().Value(ctxRequestId)
+	requestId := r.Context().Value(CtxRequestId)
 	log.Condf(LOG, "respond %v: code: %v, error: %v", requestId, code, err)
 	http.Error(w, err, code)
 }
