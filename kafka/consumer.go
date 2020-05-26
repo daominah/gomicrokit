@@ -19,7 +19,7 @@ var LOG = true
 // Offset configs the consumer
 type Offset int64
 
-// Special offset
+// Initial offset if consumer group does not have a valid committed offset
 const (
 	OffsetEarliest = Offset(sarama.OffsetOldest)
 	OffsetLatest   = Offset(sarama.OffsetNewest)
@@ -38,7 +38,10 @@ type ConsumerConfig struct {
 	BootstrapServers string
 	// comma separated list topics to subscribe: topic0,topic1,topic2
 	Topics  string
+	// GroupId is the Kafka's consumer group,
+	// consumer processes with a same groupId get a "fair share" of Kafka's partitions
 	GroupId string
+	// Offset will be used ONLY if consumer group does not have a valid offset committed
 	Offset  Offset
 }
 

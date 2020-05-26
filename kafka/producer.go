@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"strings"
-
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -11,17 +10,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Errors when produce
-var (
-	ErrWriteTimeout = errors.New("write message timeout")
-)
-
 // ProducerConfig _
 type ProducerConfig struct {
 	// BrokersList is a comma separated list: "broker1:9092,broker2:9092,broker3:9092"
 	BrokersList string
 	// DefaultTopic should not be empty
 	DefaultTopic string
+	// RequiredAcks is the level of acknowledgement reliability,
+	// recommend value: WaitForLocal
+	RequiredAcks SendMsgReliabilityLevel
 }
 
 // Producer _
@@ -35,8 +32,16 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	log.Infof("creating a producer with %#v", conf)
 	// construct sarama config
 	samConf := sarama.NewConfig()
-	samConf.Producer.RequiredAcks = sarama.WaitForLocal
-	samConf.Producer.Retry.Max = 10
+	samConf.Producer.RequiredAcks = sarama.RequiredAcks(conf.RequiredAcks)
+	samConf.Producer.Retry.Max = 5
+	samConf.Producer.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
+		ret := 100 * time.Millisecond
+		for retries > 0 {
+			ret = 2 * ret
+			retries--
+		}
+		return ret
+	}
 	samConf.Producer.Return.Successes = true
 
 	// connect to kafka
@@ -84,7 +89,7 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 		log.Condf(LOG, "sending msgId %v to %v:%v: %v",
 			uniqueId, samMsg.Topic, key, samMsg.Value)
 		err = nil
-	case <-time.After(1 * time.Second):
+	case <-time.After(10 * time.Second):
 		err = ErrWriteTimeout
 	}
 	return err
@@ -94,3 +99,21 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 func (p Producer) SendMessage(value string) error {
 	return p.SendExplicitMessage(p.defaultTopic, value, "")
 }
+
+// Errors when produce
+var (
+	ErrWriteTimeout = errors.New("write message timeout")
+)
+
+// SendMsgReliabilityLevel is the level of acknowledgement reliability.
+// * NoResponse: highest throughput,
+// * WaitForLocal: high, but not maximum durability and high but not maximum throughput,
+// * WaitForAll: no data loss,
+type SendMsgReliabilityLevel sarama.RequiredAcks
+
+// SendMsgReliabilityLevel enum
+const (
+	NoResponse   = SendMsgReliabilityLevel(sarama.NoResponse)
+	WaitForLocal = SendMsgReliabilityLevel(sarama.WaitForLocal)
+	WaitForAll   = SendMsgReliabilityLevel(sarama.WaitForAll)
+)
