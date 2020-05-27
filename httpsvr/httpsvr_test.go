@@ -64,9 +64,4 @@ func TestHttp(t *testing.T) {
 	if data.ParamId != "119" || data.QueryQ1 != "lan" || data.QueryQ2 != "dt" {
 		t.Errorf("data: %#v", data)
 	}
-
-	handler.ServeHTTP(w2, r2)
-	for _, e := range s.metric.GetCurrentMetric() {
-		t.Error(e)
-	}
 }

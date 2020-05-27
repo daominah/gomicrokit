@@ -143,7 +143,7 @@ func (s Server) ReadJson(r *http.Request, outPtr interface{}) error {
 	if err != nil {
 		return err
 	}
-	log.Condf(s.isEnableLog, "http request %v body: %s", GetRequestId(r), body)
+	log.Condf(s.isEnableLog, "http request body %v: %s", GetRequestId(r), body)
 	err = json.Unmarshal(body, outPtr)
 	return err
 }
