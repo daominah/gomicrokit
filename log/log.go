@@ -126,24 +126,24 @@ func Fatal(args ...interface{}) {
 	GlobalLogger.Fatal(args...)
 }
 
-func Fatalf(template string, args ...interface{}) {
-	GlobalLogger.Fatalf(template, args...)
+func Fatalf(format string, args ...interface{}) {
+	GlobalLogger.Fatalf(format, args...)
 }
 
 func Info(args ...interface{}) {
 	GlobalLogger.Info(args...)
 }
 
-func Infof(template string, args ...interface{}) {
-	GlobalLogger.Infof(template, args...)
+func Infof(format string, args ...interface{}) {
+	GlobalLogger.Infof(format, args...)
 }
 
 func Debug(args ...interface{}) {
 	GlobalLogger.Debug(args...)
 }
 
-func Debugf(template string, args ...interface{}) {
-	GlobalLogger.Debugf(template, args...)
+func Debugf(format string, args ...interface{}) {
+	GlobalLogger.Debugf(format, args...)
 }
 
 func Print(args ...interface{}) {
@@ -154,13 +154,13 @@ func Println(args ...interface{}) {
 	GlobalLogger.Info(args...)
 }
 
-func Printf(template string, args ...interface{}) {
-	GlobalLogger.Infof(template, args...)
+func Printf(format string, args ...interface{}) {
+	GlobalLogger.Infof(format, args...)
 }
 
-func Condf(cond bool, template string, args ...interface{}) {
+func Condf(cond bool, format string, args ...interface{}) {
 	if cond {
-		GlobalLogger.Infof(template, args...)
+		GlobalLogger.Infof(format, args...)
 	}
 }
 
@@ -190,8 +190,8 @@ func (l StdLogger) Println(args ...interface{}) {
 	GlobalLogger.Info(padArgs(args)...)
 }
 
-func (l StdLogger) Printf(template string, args ...interface{}) {
-	GlobalLogger.Infof(template, args...)
+func (l StdLogger) Printf(format string, args ...interface{}) {
+	GlobalLogger.Infof(format, args...)
 }
 
 func (l *StdLogger) Fatal(v ...interface{}) {

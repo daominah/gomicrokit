@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"errors"
+
 	"github.com/daominah/gomicrokit/httpsvr"
 	"github.com/daominah/gomicrokit/log"
 )
@@ -25,13 +27,13 @@ func (s *Server) Route() {
 
 func (s *Server) index() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		httpsvr.WriteJson(w, r, map[string]string{"Data": "Index page"})
+		s.WriteJson(w, r, map[string]string{"Data": "Index page"})
 	}
 }
 
 func (s *Server) hello() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		httpsvr.WriteJson(w, r, map[string]string{
+		s.WriteJson(w, r, map[string]string{
 			"Data": fmt.Sprintf("Hello %v", r.Context().Value("user")),
 		})
 	}
@@ -42,8 +44,10 @@ func (s Server) auth(handle http.HandlerFunc) http.HandlerFunc {
 		bearerAuth := r.Header.Get("Authorization")
 		words := strings.Split(bearerAuth, " ")
 		if len(words) != 2 || words[0] != "Bearer" {
-			httpsvr.WriteErr(w, r, http.StatusUnauthorized,
-				"need header Authorization: Bearer {token}")
+			err := errors.New("need header Authorization: Bearer {token}")
+			log.Infof("error when http respond %v: %v",
+				httpsvr.GetRequestId(r), err)
+			http.Error(w, err.Error(), 500)
 			return
 		}
 		userName := words[1]
@@ -56,7 +60,7 @@ func (s *Server) exception() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var b *float64
 		a := 1 / *b
-		httpsvr.WriteJson(w, r, map[string]float64{"a": a})
+		s.WriteJson(w, r, map[string]float64{"a": a})
 	}
 }
 

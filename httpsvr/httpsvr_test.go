@@ -10,8 +10,7 @@ import (
 
 func TestHttp(t *testing.T) {
 	s := NewServer()
-	handler := httpLogger{s.router}
-	LOG = false
+	handler := s.router
 
 	// handle 0
 	s.AddHandler("GET", "/", ExampleHandler())
@@ -34,7 +33,7 @@ func TestHttp(t *testing.T) {
 	r1 := httptest.NewRequest("GET", "/error", nil)
 	handler.ServeHTTP(w1, r1)
 	if w1.Result().StatusCode != http.StatusInternalServerError {
-		t.Error(w1.Result().Status)
+		t.Errorf("expected InternalServerError but %v",w1.Result().Status)
 	}
 
 	// handle 2
@@ -51,7 +50,7 @@ func TestHttp(t *testing.T) {
 				QueryQ1: r.FormValue("q1"),
 				QueryQ2: r.FormValue("q2"),
 			}
-			WriteJson(w, r, res)
+			s.WriteJson(w, r, res)
 		})
 	w2 := httptest.NewRecorder()
 	r2 := httptest.NewRequest("GET", "/match/119?q1=lan&q2=dt", nil)
@@ -64,5 +63,10 @@ func TestHttp(t *testing.T) {
 	}
 	if data.ParamId != "119" || data.QueryQ1 != "lan" || data.QueryQ2 != "dt" {
 		t.Errorf("data: %#v", data)
+	}
+
+	handler.ServeHTTP(w2, r2)
+	for _, e := range s.metric.GetCurrentMetric() {
+		t.Error(e)
 	}
 }

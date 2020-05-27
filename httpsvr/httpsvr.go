@@ -1,121 +1,149 @@
-// Package httpsvr supports http method, url variables and
+// Package httpsvr supports http method, url params and
 // logs all pairs of request/response. API is similar to standard net/http
 package httpsvr
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/daominah/gomicrokit/gofast"
 	"github.com/daominah/gomicrokit/log"
 	"github.com/julienschmidt/httprouter"
 )
 
-// LOG determines whether to log all pairs of request/response
-var LOG = true
-
 // Server must be inited by calling func NewServer.
 // Example usage in `a_examples/httpsvr/httpsvr.go`
 type Server struct {
+	// config defines parameters for running an HTTP server,
+	// usually user should set ReadHeaderTimeout, ReadTimeout, WriteTimeout,
+	// ReadTimeout and WriteTimeout should be bigger for a file server
+	config *http.Server
+	// router is a better http_ServeMux that supports http method, url params,
+	// example: router.AddHandler("GET", "/match/:id", func(w,r))
 	router *httprouter.Router
-	// TODO: add instrument metric for handlers
+	// default NewServer set isEnableLog = true
+	isEnableLog bool
+	// default NewServer set isEnableMetric = true
+	isEnableMetric bool
+	metric         Metric
 }
 
-// NewServer returns a inited Server
-func NewServer() *Server { return &Server{router: httprouter.New()} }
+// NewServer returns a inited Server,
+// for more configs, use NewServerWithConf instead of this func
+func NewServer() *Server {
+	return &Server{
+		config: &http.Server{
+			ReadHeaderTimeout: 20 * time.Second,
+			ReadTimeout:       10 * time.Minute,
+			WriteTimeout:      20 * time.Minute,
+		},
+		isEnableLog:    true,
+		isEnableMetric: true,
+		router:         httprouter.New(),
+		metric:         NewMemoryMetric(),
+	}
+}
 
-// AddHandler must be called before ListenAndServe
+// NewServerWithConf returns a inited Server from input args,
+// for simple usage, use NewServer instead of this func
+func NewServerWithConf(config *http.Server, isEnableLog bool,
+	isEnableMetric bool, metric Metric) *Server {
+	if isEnableMetric && metric == nil {
+		metric = NewMemoryMetric()
+	}
+	return &Server{
+		config:         config,
+		isEnableLog:    isEnableLog,
+		isEnableMetric: isEnableMetric,
+		router:         httprouter.New(),
+		metric:         metric,
+	}
+}
+
+// AddHandler must be called before ListenAndServe,
 // ex: AddHandler("GET", "/", ExampleHandler())
 func (s *Server) AddHandler(method string, path string, handler http.HandlerFunc) {
-	defer func() {
+	defer func() { // example: add a same handler twice
 		if r := recover(); r != nil {
 			log.Infof("error when AddHandler: %v", r)
 		}
 	}()
-	s.router.HandlerFunc(method, path, handler)
+	handlerWithLog := func(w http.ResponseWriter, r *http.Request) {
+		requestId := gofast.GenUUID()
+		ctx := context.WithValue(r.Context(), CtxRequestId, requestId)
+		query := r.URL.Query().Encode()
+		if query != "" {
+			query = "?" + query
+		}
+		log.Condf(s.isEnableLog, "http request %v from %v: %v %v%v",
+			requestId, r.RemoteAddr, r.Method, r.URL.Path, query)
+		handler(w, r.WithContext(ctx))
+	}
+	if !s.isEnableMetric {
+		s.router.HandlerFunc(method, path, handlerWithLog)
+		return
+	}
+	metricKey := fmt.Sprintf("%v_%v", path, method)
+	handlerWithMetric := func(w http.ResponseWriter, r *http.Request) {
+		s.metric.Count(metricKey, 1)
+		beginTime := time.Now()
+		handlerWithLog(w, r)
+		s.metric.Duration(metricKey, time.Since(beginTime))
+	}
+	s.router.HandlerFunc(method, path, handlerWithMetric)
 }
 
 // ListenAndServe listens on the TCP network address addr.
 // Accepted connections are configured to enable TCP keep-alives.
-func (s Server) ListenAndServe(addr string) error {
-	loggerWrapper := httpLogger{handler: s.router}
+func (s *Server) ListenAndServe(addr string) error {
 	log.Infof("http server is listening on port %v", addr)
-	err := http.ListenAndServe(addr, loggerWrapper)
+	s.config.Addr = addr
+	err := s.config.ListenAndServe()
 	return err
 }
 
-// httpLogger is a wrapper that help to log all requests
-type httpLogger struct {
-	handler http.Handler
+// ListenAndServe listens on the port s_config_Addr
+func (s *Server) ListenAndServe2() error {
+	return s.ListenAndServe(s.config.Addr)
 }
 
-// log on every received request
-func (l httpLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// http request's body can only be read once,
-	// below codes help to read the body twice, the first read is for logging
-	reqBodyBytes, _ := ioutil.ReadAll(r.Body)
-	r.Body.Close()
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(reqBodyBytes))
-	query := r.URL.Query().Encode()
-	if query != "" {
-		query = "?" + query
-	}
-
-	requestId := gofast.GenUUID()[:8]
-	log.Condf(LOG, "request %v from %v: %v %v%v %v",
-		requestId, r.RemoteAddr, r.Method, r.URL.Path, query, string(reqBodyBytes))
-
-	ctx := context.WithValue(r.Context(), CtxRequestId, requestId)
-	l.handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
-type ctxKey string
+// avoid context key conflict
+type ctxKeyType string
 
 // CtxRequestId is a internal request id
-const CtxRequestId ctxKey = "CtxRequestId"
-
-// Write includes logging, input r is the corresponding request of the response
-func Write(w http.ResponseWriter, r *http.Request, bodyB []byte) {
-	_, err := w.Write(bodyB)
-	bodyS := string(bodyB)
-	if err != nil {
-		errMsg := fmt.Sprintf("error when writer write: %v, %v", err, bodyS)
-		WriteErr(w, r, http.StatusInternalServerError, errMsg)
-		return
-	}
-	requestId := r.Context().Value(CtxRequestId)
-	log.Condf(LOG, "respond %v successfully: %v", requestId, bodyS)
-}
+const CtxRequestId ctxKeyType = "CtxRequestId"
 
 // WriteJson includes logging, input r is the corresponding request of the response
-func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) {
+func (s Server) WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) (
+	int, error) {
 	bodyB, err := json.Marshal(obj)
 	if err != nil {
-		errMsg := fmt.Sprintf("%v, obj: %#v", err, obj)
-		WriteErr(w, r, http.StatusInternalServerError, errMsg)
-		return
+		log.Condf(s.isEnableLog, "error when http respond %v: %v",
+			GetRequestId(r), err)
+		http.Error(w, err.Error(), 500)
+		return 0, err
 	}
-	Write(w, r, bodyB)
-}
-
-// WriteErr responds with the HTTP code and the err message in body.
-// WriteErr includes logging, input r is the corresponding request of the response
-func WriteErr(w http.ResponseWriter, r *http.Request, code int, err string) {
-	requestId := r.Context().Value(CtxRequestId)
-	log.Condf(LOG, "respond %v: code: %v, error: %v", requestId, code, err)
-	http.Error(w, err, code)
+	n, err := w.Write(bodyB)
+	if err != nil {
+		log.Condf(s.isEnableLog, "error when http respond %v: %v",
+			GetRequestId(r), err)
+		return n, err
+	}
+	log.Condf(s.isEnableLog, "http respond %v: %s", GetRequestId(r), bodyB)
+	return n, nil
 }
 
 // ReadJson reads http request body to outPtr
-func ReadJson(r *http.Request, outPtr interface{}) error {
+func (s Server) ReadJson(r *http.Request, outPtr interface{}) error {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
+	log.Condf(s.isEnableLog, "http request %v body: %s", GetRequestId(r), body)
 	err = json.Unmarshal(body, outPtr)
 	return err
 }
@@ -134,14 +162,20 @@ func GetUrlParams(r *http.Request) map[string]string {
 	return result
 }
 
+// GetRequestId returns the auto generated requestId
+func GetRequestId(r *http.Request) string {
+	return fmt.Sprintf("%v", r.Context().Value(CtxRequestId))
+}
+
 // ExampleHandler _
 func ExampleHandler() http.HandlerFunc {
 	// thing := initHandler() // one-time per-handler initialisation
 	return func(w http.ResponseWriter, r *http.Request) {
 		var request struct{ Field0 string }
-		_ = ReadJson(r, &request)
+		_ = Server{isEnableLog: true}.ReadJson(r, &request)
 		_ = GetUrlParams(r)
-		WriteJson(w, r, map[string]string{"Error": "", "Data": "PONG"})
+		Server{isEnableLog: true}.WriteJson(
+			w, r, map[string]string{"Error": "", "Data": "PONG"})
 	}
 }
 
@@ -149,6 +183,7 @@ func ExampleHandler() http.HandlerFunc {
 func ExampleHandlerError() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// not marshallable data
-		WriteJson(w, r, map[string]interface{}{"Data": func() {}})
+		Server{isEnableLog: true}.WriteJson(
+			w, r, map[string]interface{}{"Data": func() {}})
 	}
 }
