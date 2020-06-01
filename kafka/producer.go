@@ -65,7 +65,7 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 			if errMsg == "circuit breaker is open" {
 				errMsg = "probably you did not assign topic"
 			}
-			metricKey := fmt.Sprintf("error_%v:%v", err.Msg.Topic, err.Msg.Partition)
+			metricKey := fmt.Sprintf("%v:%v_error", err.Msg.Topic, err.Msg.Partition)
 			p.Metric.Count(metricKey)
 			p.Metric.Duration(metricKey, since(err.Msg.Metadata))
 			log.Infof("failed to write msgId %v to topic %v: %v",
@@ -74,7 +74,7 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	}()
 	go func() {
 		for sent := range p.samProducer.Successes() {
-			metricKey := fmt.Sprintf("error_%v:%v", sent.Topic, sent.Partition)
+			metricKey := fmt.Sprintf("%v:%v_success", sent.Topic, sent.Partition)
 			p.Metric.Count(metricKey)
 			p.Metric.Duration(metricKey, since(sent.Metadata))
 			log.Condf(LOG, "delivered msgId %v to topic %v:%v:%v",
