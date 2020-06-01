@@ -132,6 +132,7 @@ func (s Server) WriteJson(w http.ResponseWriter, r *http.Request, obj interface{
 		http.Error(w, err.Error(), 500)
 		return 0, err
 	}
+	w.Header().Set("Content-Type", "application/json")
 	n, err := w.Write(bodyB)
 	if err != nil {
 		log.Condf(s.isEnableLog, "error when http respond %v: %v",
