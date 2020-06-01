@@ -12,6 +12,7 @@ import (
 
 	"github.com/daominah/gomicrokit/gofast"
 	"github.com/daominah/gomicrokit/log"
+	"github.com/daominah/gomicrokit/metric"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -29,7 +30,7 @@ type Server struct {
 	isEnableLog bool
 	// default NewServer set isEnableMetric = true
 	isEnableMetric bool
-	metric         Metric
+	Metric         metric.Metric
 }
 
 // NewServer returns a inited Server,
@@ -44,23 +45,23 @@ func NewServer() *Server {
 		isEnableLog:    true,
 		isEnableMetric: true,
 		router:         httprouter.New(),
-		metric:         NewMemoryMetric(),
+		Metric:         metric.NewMemoryMetric(),
 	}
 }
 
 // NewServerWithConf returns a inited Server from input args,
 // for simple usage, use NewServer instead of this func
 func NewServerWithConf(config *http.Server, isEnableLog bool,
-	isEnableMetric bool, metric Metric) *Server {
-	if isEnableMetric && metric == nil {
-		metric = NewMemoryMetric()
+	isEnableMetric bool, metric0 metric.Metric) *Server {
+	if isEnableMetric && metric0 == nil {
+		metric0 = metric.NewMemoryMetric()
 	}
 	return &Server{
 		config:         config,
 		isEnableLog:    isEnableLog,
 		isEnableMetric: isEnableMetric,
 		router:         httprouter.New(),
-		metric:         metric,
+		Metric:         metric0,
 	}
 }
 
@@ -89,10 +90,10 @@ func (s *Server) AddHandler(method string, path string, handler http.HandlerFunc
 	}
 	metricKey := fmt.Sprintf("%v_%v", path, method)
 	handlerWithMetric := func(w http.ResponseWriter, r *http.Request) {
-		s.metric.Count(metricKey, 1)
+		s.Metric.Count(metricKey)
 		beginTime := time.Now()
 		handlerWithLog(w, r)
-		s.metric.Duration(metricKey, time.Since(beginTime))
+		s.Metric.Duration(metricKey, time.Since(beginTime))
 	}
 	s.router.HandlerFunc(method, path, handlerWithMetric)
 }
