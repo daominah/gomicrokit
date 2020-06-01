@@ -36,15 +36,17 @@ type Server struct {
 // NewServer returns a inited Server,
 // for more configs, use NewServerWithConf instead of this func
 func NewServer() *Server {
+	router := httprouter.New()
 	return &Server{
 		config: &http.Server{
 			ReadHeaderTimeout: 20 * time.Second,
 			ReadTimeout:       10 * time.Minute,
 			WriteTimeout:      20 * time.Minute,
+			Handler:           router,
 		},
 		isEnableLog:    true,
 		isEnableMetric: true,
-		router:         httprouter.New(),
+		router:         router,
 		Metric:         metric.NewMemoryMetric(),
 	}
 }
@@ -56,11 +58,13 @@ func NewServerWithConf(config *http.Server, isEnableLog bool,
 	if isEnableMetric && metric0 == nil {
 		metric0 = metric.NewMemoryMetric()
 	}
+	router := httprouter.New()
+	config.Handler = router
 	return &Server{
 		config:         config,
 		isEnableLog:    isEnableLog,
 		isEnableMetric: isEnableMetric,
-		router:         httprouter.New(),
+		router:         router,
 		Metric:         metric0,
 	}
 }
