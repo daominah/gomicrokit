@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/daominah/GoLLRB/llrb"
-	"github.com/daominah/gomicrokit/gofast"
 )
 
-// Metric monitors number of requests, duration of requests
+// Metric monitors number of requests, duration of requests,
+// Metric's methods must be safe for concurrent calls
 type Metric interface {
 	// Count increases count value of the key by 1
 	Count(key string)
@@ -42,7 +42,8 @@ type RowDisplay struct {
 	Percentile997   time.Duration
 }
 
-// MemoryMetric implements Metric interface
+// MemoryMetric implements Metric interface,
+// this struct's methods is safe for concurrent calls
 type MemoryMetric struct {
 	current map[string]*Row
 	prev    map[string]*Row
@@ -57,15 +58,13 @@ type Row struct {
 	*sync.Mutex
 }
 
-// NewMemoryMetric return a memory implement of Metric interface,
-// this struct's methods is safe for concurrent calls
+// NewMemoryMetric returns a memory implement of Metric interface
 func NewMemoryMetric() *MemoryMetric {
 	ret := &MemoryMetric{
 		prev:    make(map[string]*Row),
 		current: make(map[string]*Row),
 		Mutex:   &sync.Mutex{},
 	}
-	gofast.NewCron(ret.Reset, 24*time.Hour, 17*time.Hour)
 	return ret
 }
 
@@ -153,7 +152,7 @@ func (r Row) Display(key string) RowDisplay {
 
 // do not lock row in this func
 func calcRowPercentile(row Row, percentile float64) time.Duration {
-	rank := int(math.Ceil(percentile*float64(row.Durations.Len())))
+	rank := int(math.Ceil(percentile * float64(row.Durations.Len())))
 	item := row.Durations.GetByRank(rank)
 	dur, ok := item.(Duration)
 	if item == nil || !ok {

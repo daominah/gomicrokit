@@ -4,9 +4,12 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
+
 	"github.com/Shopify/sarama"
 	"github.com/daominah/gomicrokit/gofast"
 	"github.com/daominah/gomicrokit/log"
+	"github.com/daominah/gomicrokit/metric"
 	"github.com/pkg/errors"
 )
 
@@ -25,6 +28,7 @@ type ProducerConfig struct {
 type Producer struct {
 	defaultTopic string
 	samProducer  sarama.AsyncProducer
+	Metric       metric.Metric
 }
 
 // NewProducer returns a connected Producer
@@ -45,7 +49,9 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	samConf.Producer.Return.Successes = true
 
 	// connect to kafka
-	p := &Producer{defaultTopic: conf.DefaultTopic}
+	metric := metric.NewMemoryMetric()
+	gofast.NewCron(metric.Reset, 24*time.Hour, 17*time.Hour)
+	p := &Producer{defaultTopic: conf.DefaultTopic, Metric: metric}
 	brokers := strings.Split(conf.BrokersList, ",")
 	var err error
 	p.samProducer, err = sarama.NewAsyncProducer(brokers, samConf)
@@ -59,12 +65,18 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 			if errMsg == "circuit breaker is open" {
 				errMsg = "probably you did not assign topic"
 			}
+			metricKey := fmt.Sprintf("error_%v:%v", err.Msg.Topic, err.Msg.Partition)
+			p.Metric.Count(metricKey)
+			p.Metric.Duration(metricKey, since(err.Msg.Metadata))
 			log.Infof("failed to write msgId %v to topic %v: %v",
 				err.Msg.Metadata, err.Msg.Topic, errMsg)
 		}
 	}()
 	go func() {
 		for sent := range p.samProducer.Successes() {
+			metricKey := fmt.Sprintf("error_%v:%v", sent.Topic, sent.Partition)
+			p.Metric.Count(metricKey)
+			p.Metric.Duration(metricKey, since(sent.Metadata))
 			log.Condf(LOG, "delivered msgId %v to topic %v:%v:%v",
 				sent.Metadata, sent.Topic, sent.Partition, sent.Offset)
 		}
@@ -74,11 +86,11 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 
 // SendExplicitMessage sends messages have a same key to same partition
 func (p Producer) SendExplicitMessage(topic string, value string, key string) error {
-	uniqueId := gofast.GenUUID()[:8]
+	msgMeta := MsgMetadata{UniqueId: gofast.GenUUID(), SentAt: time.Now()}
 	samMsg := &sarama.ProducerMessage{
 		Value:    sarama.StringEncoder(value),
 		Topic:    topic,
-		Metadata: uniqueId,
+		Metadata: msgMeta,
 	}
 	if key != "" {
 		samMsg.Key = sarama.StringEncoder(key)
@@ -87,9 +99,9 @@ func (p Producer) SendExplicitMessage(topic string, value string, key string) er
 	select {
 	case p.samProducer.Input() <- samMsg:
 		log.Condf(LOG, "sending msgId %v to %v:%v: %v",
-			uniqueId, samMsg.Topic, key, samMsg.Value)
+			msgMeta.UniqueId, samMsg.Topic, key, samMsg.Value)
 		err = nil
-	case <-time.After(10 * time.Second):
+	case <-time.After(30 * time.Second):
 		err = ErrWriteTimeout
 	}
 	return err
@@ -117,3 +129,16 @@ const (
 	WaitForLocal = SendMsgReliabilityLevel(sarama.WaitForLocal)
 	WaitForAll   = SendMsgReliabilityLevel(sarama.WaitForAll)
 )
+
+type MsgMetadata struct {
+	UniqueId string
+	SentAt   time.Time
+}
+
+func since(msgMetaI interface{}) time.Duration {
+	msgMeta, ok := msgMetaI.(MsgMetadata)
+	if !ok {
+		return 0
+	}
+	return time.Since(msgMeta.SentAt)
+}
