@@ -37,13 +37,10 @@ type Server struct {
 // for more configs, use NewServerWithConf instead of this func
 func NewServer() *Server {
 	router := httprouter.New()
+	config := NewDefaultConfig()
+	config.Handler = router
 	return &Server{
-		config: &http.Server{
-			ReadHeaderTimeout: 20 * time.Second,
-			ReadTimeout:       10 * time.Minute,
-			WriteTimeout:      20 * time.Minute,
-			Handler:           router,
-		},
+		config:         config,
 		isEnableLog:    true,
 		isEnableMetric: true,
 		router:         router,
@@ -51,12 +48,16 @@ func NewServer() *Server {
 	}
 }
 
-// NewServerWithConf returns a inited Server from input args,
-// for simple usage, use NewServer instead of this func
+// NewServerWithConf returns a inited Server from input args.
+// This func will ignore config_Handler.
+// for simple usage, use NewServer instead of this func.
 func NewServerWithConf(config *http.Server, isEnableLog bool,
 	isEnableMetric bool, metric0 metric.Metric) *Server {
 	if isEnableMetric && metric0 == nil {
 		metric0 = metric.NewMemoryMetric()
+	}
+	if config == nil {
+		config = NewDefaultConfig()
 	}
 	router := httprouter.New()
 	config.Handler = router
@@ -70,7 +71,7 @@ func NewServerWithConf(config *http.Server, isEnableLog bool,
 }
 
 // AddHandler must be called before ListenAndServe,
-// ex: AddHandler("GET", "/", ExampleHandler())
+// ex: AddHandler("GET", "/", ExampleHandler()).
 func (s *Server) AddHandler(method string, path string, handler http.HandlerFunc) {
 	defer func() { // example: add a same handler twice
 		if r := recover(); r != nil {
@@ -191,5 +192,14 @@ func ExampleHandlerError() http.HandlerFunc {
 		// not marshallable data
 		Server{isEnableLog: true}.WriteJson(
 			w, r, map[string]interface{}{"Data": func() {}})
+	}
+}
+
+// NewDefaultConfig is my http server default config
+func NewDefaultConfig() *http.Server {
+	return &http.Server{
+		ReadHeaderTimeout: 20 * time.Second,
+		ReadTimeout:       10 * time.Minute,
+		WriteTimeout:      20 * time.Minute,
 	}
 }
