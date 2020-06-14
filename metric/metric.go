@@ -173,8 +173,8 @@ func (d RowDisplay) String() string {
 type SortByKey []RowDisplay
 
 func (h SortByKey) Len() int           { return len(h) }
-func (h SortByKey) Less(i, j int) bool { return h[i].Key < h[j].Key }
 func (h SortByKey) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h SortByKey) Less(i, j int) bool { return h[i].Key < h[j].Key }
 
 // Duration is time_Duration with method Less
 type Duration time.Duration
@@ -183,3 +183,9 @@ func (d Duration) Less(than llrb.Item) bool {
 	tmp, _ := than.(Duration)
 	return d < tmp
 }
+
+type SortByAveDur []RowDisplay
+
+func (h SortByAveDur) Len() int           { return len(h) }
+func (h SortByAveDur) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h SortByAveDur) Less(i, j int) bool { return h[i].AverageDuration < h[j].AverageDuration }
