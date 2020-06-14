@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 )
 
 // GenRsaPair generates an RSA keypair of 4096 bit size
@@ -30,7 +29,6 @@ func GenRsaPair() (idRsa string, idRsaPub string) {
 		Type:  "RSA PUBLIC KEY",
 		Bytes: pubASN1,
 	})
-	ioutil.WriteFile("key.pub", pubBytes, 0644)
 	idRsaPub = string(pubBytes)
 
 	return idRsa, idRsaPub

@@ -1,47 +1,47 @@
 # Gomicrokit
-Often used package for microservices
+Often used packages for developing microservices
 
+## Packages
 
-### Packages
+### `auth`
+* __genrsa__: generate a RSA key pair as PEM files (idRsa, idRsaPub)
+* __jwt__: easy to use JSON web token,
+  depend on [dgrijalva/jwt-go](https://github.com/dgrijalva/jwt-go)  
+  `CreateAuthToken(authInfo interface{}) (jwtToken string)`  
+  `CheckAuthToken(jwtToken string, outPointer interface{}) error`  
+* __password__:  
+`HashPassword(plain string) (hashed string)`  
+`CheckHashPassword(hashed string, plain string) bool`
 
-##### `a_examples`
-Directory a_examples contains executables as example usage of 
-other packages in this project
+### `gofast`
+Often used functions. Ex: cron job, find index in slice, UUID, ..
 
-##### `auth`
-Packages: genrsa, jwt, password  
-Depend on [dgrijalva/jwt-go](https://github.com/dgrijalva/jwt-go)
+### `httpsvr`
+Http server supports http method, url params, logging, metric.  
+API is similar to standard http ServeMux HandleFunc.  
+Depend on [julienschmidt/httprouter](https://github.com/julienschmidt/httprouter)
 
-##### `gofast`
-Often used functions. Ex: cron job, copy similar struct,
-gen uuid, ..
-
-##### `httpsvr`
-Http server supports http method, url variables and
- logs all pairs of request/response.  
- Depend on [julienschmidt/httprouter](https://github.com/julienschmidt/httprouter)
-
-##### `kafka`
-An easy-to-use, pure go kafka client.  
+### `kafka`
+An easy to use, pure go [Kafka](https://kafka.apache.org/) client.  
 Depend on [Shopify/sarama](https://github.com/Shopify/sarama)
 
-##### `log`
-A leveled, rotated by time or file size logger.  
+### `log`
+A leveled, rotated (by time and file size) logger.  
 Depend on [go.uber.org/zap](https://github.com/uber-go/zap)
 and [natefinch/lumberjack](https://github.com/natefinch/lumberjack)
 
-##### `textproc`:
+### `metric`
+Package metric is used for observing request count and duration.  
+It use an order statistic tree to store durations, so it can calculate 
+percentiles very fast.
+
+### `textproc`
 Extracting information from text and html
 
-##### `socketio`
-It is recommend to use websocket (standardized by IETF) instead.  
-Modified from [graarh/golang-socketio](https://github.com/graarh/golang-socketio)
-
-##### `websocket`
+### `websocket`
 An easy-to-use websocket client and server.  
 Depend on [gorilla/websocket](https://github.com/gorilla/websocket)
 
-
-### Docker
-```docker build --tag=gomicrokit --file=./Dockerfile .```  
-```docker run -dit --name=gomicrokit --restart=no --network=host gomicrokit```  
+## Example usages
+Directory `a_examples` contains executables as example usage of 
+other packages in this project

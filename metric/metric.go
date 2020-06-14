@@ -1,3 +1,5 @@
+// Package metric is used for observing request count and duration,
+// it can calculate percentile of durations, default output percentile for 68–95–99.7
 package metric
 
 import (
