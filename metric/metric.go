@@ -188,4 +188,4 @@ type SortByAveDur []RowDisplay
 
 func (h SortByAveDur) Len() int           { return len(h) }
 func (h SortByAveDur) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-func (h SortByAveDur) Less(i, j int) bool { return h[i].AverageDuration < h[j].AverageDuration }
+func (h SortByAveDur) Less(i, j int) bool { return h[i].AverageDuration > h[j].AverageDuration }
