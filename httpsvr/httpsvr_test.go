@@ -33,7 +33,7 @@ func TestHttp(t *testing.T) {
 	r1 := httptest.NewRequest("GET", "/error", nil)
 	handler.ServeHTTP(w1, r1)
 	if w1.Result().StatusCode != http.StatusInternalServerError {
-		t.Errorf("expected InternalServerError but %v",w1.Result().Status)
+		t.Errorf("expected InternalServerError but %v", w1.Result().Status)
 	}
 
 	// handle 2
@@ -64,4 +64,6 @@ func TestHttp(t *testing.T) {
 	if data.ParamId != "119" || data.QueryQ1 != "lan" || data.QueryQ2 != "dt" {
 		t.Errorf("data: %#v", data)
 	}
+
+	t.Log(s.Metric.GetCurrentMetric())
 }

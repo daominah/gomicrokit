@@ -18,8 +18,6 @@ type Server struct {
 
 func (s *Server) Route() {
 	s.AddHandler("GET", "/", s.index())
-	// error a handle is already registered for path '/'
-	s.AddHandler("GET", "/", s.index())
 	s.AddHandler("GET", "/admin", s.auth(s.hello()))
 	s.AddHandler("GET", "/error", httpsvr.ExampleHandlerError())
 	s.AddHandler("GET", "/exception", s.exception())
