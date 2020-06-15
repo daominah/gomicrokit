@@ -6,7 +6,7 @@ require (
 	github.com/Shopify/sarama v1.24.1
 	github.com/antchfx/htmlquery v1.2.1
 	github.com/antchfx/xpath v1.1.3
-	github.com/daominah/GoLLRB v0.0.2
+	github.com/daominah/GoLLRB v0.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
