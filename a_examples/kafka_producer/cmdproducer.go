@@ -18,18 +18,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i > -1; i++ {
-		time.Sleep(500 * time.Millisecond)
-		go func(i int) {
-			_ = time.Millisecond
-			err := producer.SendMessage(fmt.Sprintf("pussy %v %v", i, time.Now().Format(time.RFC3339)))
-			//err := producer.SendExplicitMessage(conf.DefaultTopic, fmt.Sprintf("pussy %v", i), "key0")
-			if err != nil {
-				log.Info(err)
-			}
-		}(i)
-		//break
+	msg := fmt.Sprintf("pussy %v", time.Now().Format(time.RFC3339))
+	err = producer.SendMessage(msg)
+	if err != nil {
+		log.Info(err)
 	}
-	log.Infof("the loop ended")
 	select {}
 }
