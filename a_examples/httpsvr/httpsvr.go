@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-
-	"errors"
 
 	"github.com/daominah/gomicrokit/httpsvr"
 	"github.com/daominah/gomicrokit/log"
@@ -67,6 +66,7 @@ func main() {
 	s.Route()
 	port := ":8000"
 	log.Infof("url0: http://127.0.0.1%v/", port)
+	log.Infof("url0: http://127.0.0.1%v/__metric", port)
 	log.Infof("url1: http://127.0.0.1%v/admin", port)
 	log.Infof("url2: http://127.0.0.1%v/error", port)
 	err := s.ListenAndServe(port)

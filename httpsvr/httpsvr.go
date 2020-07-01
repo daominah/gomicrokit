@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/daominah/gomicrokit/gofast"
@@ -39,13 +40,15 @@ func NewServer() *Server {
 	router := httprouter.New()
 	config := NewDefaultConfig()
 	config.Handler = router
-	return &Server{
+	s := &Server{
 		config:         config,
 		isEnableLog:    true,
 		isEnableMetric: true,
 		router:         router,
 		Metric:         metric.NewMemoryMetric(),
 	}
+	s.AddHandler("GET", "/__metric", s.handleMetric())
+	return s
 }
 
 // NewServerWithConf returns a inited Server from input args.
@@ -62,13 +65,15 @@ func NewServerWithConf(config *http.Server, isEnableLog bool,
 	}
 	router := httprouter.New()
 	config.Handler = router
-	return &Server{
+	s := &Server{
 		config:         config,
 		isEnableLog:    isEnableLog,
 		isEnableMetric: isEnableMetric,
 		router:         router,
 		Metric:         metric0,
 	}
+	s.AddHandler("GET", "/__metric", s.handleMetric())
+	return s
 }
 
 // AddHandler must be called before ListenAndServe,
@@ -163,6 +168,19 @@ func (s Server) ReadJson(r *http.Request, outPtr interface{}) error {
 	return err
 }
 
+func (s Server) handleMetric() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		currentMetric := s.Metric.GetCurrentMetric()
+		sort.Sort(metric.SortByAveDur(currentMetric))
+		ret := make([]metric.RowJsonable, 0)
+		for _, row := range currentMetric {
+			ret = append(ret, row.ToRowJsonable())
+		}
+		beauty, _ := json.MarshalIndent(ret, "", "	")
+		w.Write(beauty)
+	}
+}
+
 var emptyServer = &Server{isEnableLog: true}
 
 func WriteJson(w http.ResponseWriter, r *http.Request, obj interface{}) (int, error) {
@@ -202,18 +220,16 @@ func ExampleHandler() http.HandlerFunc {
 	// thing := initHandler() // one-time per-handler initialisation
 	return func(w http.ResponseWriter, r *http.Request) {
 		var request struct{ Field0 string }
-		_ = Server{isEnableLog: true}.ReadJson(r, &request)
-		_ = GetUrlParams(r)
-		Server{isEnableLog: true}.WriteJson(
-			w, r, map[string]string{"Error": "", "Data": "PONG"})
+		ReadJson(r, &request)
+		GetUrlParams(r)
+		WriteJson(w, r, map[string]string{"Error": "", "Data": "PONG"})
 	}
 }
 
 func ExampleHandlerError() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// not marshallable data
-		Server{isEnableLog: true}.WriteJson(
-			w, r, map[string]interface{}{"Data": func() {}})
+		WriteJson(w, r, map[string]interface{}{"Data": func() {}})
 	}
 }
 

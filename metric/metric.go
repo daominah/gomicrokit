@@ -163,11 +163,34 @@ func calcRowPercentile(row Row, percentile float64) time.Duration {
 	return time.Duration(dur)
 }
 
-func (d RowDisplay) String() string {
+func (r RowDisplay) String() string {
 	return fmt.Sprintf(
 		"key: %v, count: %v, dur: %v, aveDur: %v, p68: %v, p95: %v, p99.7: %v",
-		d.Key, d.Count, d.TotalDuration, d.AverageDuration,
-		d.Percentile68, d.Percentile95, d.Percentile997)
+		r.Key, r.Count, r.TotalDuration, r.AverageDuration,
+		r.Percentile68, r.Percentile95, r.Percentile997)
+}
+
+// RowJsonable because time.Duration json is not readable
+type RowJsonable struct {
+	RequestKey     string
+	Count          int
+	AverageSeconds float64
+	TotalSeconds   float64
+	Percentile68   float64
+	Percentile95   float64
+	Percentile997  float64
+}
+
+func (r RowDisplay) ToRowJsonable() RowJsonable {
+	return RowJsonable{
+		RequestKey:     r.Key,
+		Count:          r.Count,
+		AverageSeconds: r.AverageDuration.Seconds(),
+		TotalSeconds:   r.TotalDuration.Seconds(),
+		Percentile68:   r.Percentile68.Seconds(),
+		Percentile95:   r.Percentile95.Seconds(),
+		Percentile997:  r.Percentile997.Seconds(),
+	}
 }
 
 type SortByKey []RowDisplay
