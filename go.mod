@@ -14,7 +14,6 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/klauspost/cpuid v1.2.2 // indirect
 	github.com/natefinch/lumberjack v2.0.0+incompatible
-	github.com/pkg/errors v0.8.1
 	go.uber.org/zap v1.12.0
 	golang.org/x/crypto v0.0.0-20190510104115-cbcb75029529
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859

@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-
-	errors2 "github.com/pkg/errors"
 )
 
 var (
@@ -20,7 +18,7 @@ var (
 func CopySameFields(d interface{}, s interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors2.Wrap(err, fmt.Sprintf("%v", r))
+			err = fmt.Errorf("error CopySameFields: %v", r)
 		}
 	}()
 	if reflect.ValueOf(d).Kind() != reflect.Ptr {
@@ -29,6 +27,7 @@ func CopySameFields(d interface{}, s interface{}) (err error) {
 	dType, dValue := reflect.TypeOf(d).Elem(), reflect.ValueOf(d).Elem()
 	sType, sValue := reflect.TypeOf(s), reflect.ValueOf(s)
 	if sValue.Kind() == reflect.Ptr {
+		sType = sType.Elem()
 		sValue = sValue.Elem()
 	}
 	if !sValue.IsValid() {

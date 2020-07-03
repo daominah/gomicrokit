@@ -3,6 +3,7 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/daominah/gomicrokit/log"
-	"github.com/pkg/errors"
 )
 
 // LOG determines whether to log when sending or receiving a message.
@@ -37,12 +37,12 @@ type ConsumerConfig struct {
 	// comma separated list: broker1:9092,broker2:9092,broker3:9092
 	BootstrapServers string
 	// comma separated list topics to subscribe: topic0,topic1,topic2
-	Topics  string
+	Topics string
 	// GroupId is the Kafka's consumer group,
 	// consumer processes with a same groupId get a "fair share" of Kafka's partitions
 	GroupId string
 	// Offset will be used ONLY if consumer group does not have a valid offset committed
-	Offset  Offset
+	Offset Offset
 }
 
 // Message represents a message consumed from kafka
@@ -74,7 +74,7 @@ func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	// construct sarama config
 	kafkaVersion, err := sarama.ParseKafkaVersion("1.1.1")
 	if err != nil {
-		return nil, errors.Wrap(err, "error when parse kafka version")
+		return nil, fmt.Errorf("error parse kafka version: %v", err)
 	}
 	samConf := sarama.NewConfig()
 	samConf.Version = kafkaVersion
@@ -85,7 +85,7 @@ func NewConsumer(conf ConsumerConfig) (*Consumer, error) {
 	brokers := strings.Split(conf.BootstrapServers, ",")
 	c.client, err = sarama.NewConsumerGroup(brokers, conf.GroupId, samConf)
 	if err != nil {
-		return nil, errors.Wrap(err, "err when create consumer client")
+		return nil, fmt.Errorf("err create consumer client: %v", err)
 	}
 	log.Infof("connected to kafka cluster %v", conf.BootstrapServers)
 

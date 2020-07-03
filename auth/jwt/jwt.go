@@ -4,6 +4,7 @@ package jwt
 import (
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"os"
 	"reflect"
 	"strconv"
@@ -12,7 +13,6 @@ import (
 	"github.com/daominah/gomicrokit/auth/genrsa"
 	"github.com/daominah/gomicrokit/log"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
 )
 
 // JWTer can create a authorization token or read data from a valid token

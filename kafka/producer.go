@@ -1,16 +1,15 @@
 package kafka
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"time"
-
-	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/daominah/gomicrokit/gofast"
 	"github.com/daominah/gomicrokit/log"
 	"github.com/daominah/gomicrokit/metric"
-	"github.com/pkg/errors"
 )
 
 // ProducerConfig _
@@ -56,7 +55,7 @@ func NewProducer(conf ProducerConfig) (*Producer, error) {
 	var err error
 	p.samProducer, err = sarama.NewAsyncProducer(brokers, samConf)
 	if err != nil {
-		return nil, errors.Wrap(err, "error when create producer")
+		return nil, fmt.Errorf("error create producer: %v", err)
 	}
 	log.Infof("connected to kafka cluster %v", conf.BrokersList)
 	go func() {
